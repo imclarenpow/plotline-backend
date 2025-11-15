@@ -1,0 +1,48 @@
+{
+    "description": "a fast paced action filled story where kids are recruited to become secret agents called cherub agents\r\nJames Adams has been recruited after his mum die's and is ready to take on what ever training has install for him\r\nwarning not suitable for younger readers",
+    "covers": [
+        206536
+    ],
+    "key": "/works/OL8317404W",
+    "authors": [
+        {
+            "type": {
+                "key": "/type/author_role"
+            },
+            "author": {
+                "key": "/authors/OL2764001A"
+            }
+        }
+    ],
+    "title": "The Recruit (CHERUB #1)",
+    "subjects": [
+        "Great Britain. MI5",
+        "Juvenile fiction",
+        "Teenagers",
+        "Fiction",
+        "Intelligence service",
+        "Great Britain",
+        "Spies",
+        "Children's fiction",
+        "Spies, fiction",
+        "Terrorism, fiction",
+        "Adventure stories",
+        "Terrorists",
+        "Spy stories",
+        "Adventure and adventurers",
+        "Orphans"
+    ],
+    "type": {
+        "key": "/type/work"
+    },
+    "latest_revision": 11,
+    "revision": 11,
+    "created": {
+        "type": "/type/datetime",
+        "value": "2009-12-10T22:38:07.417830"
+    },
+    "last_modified": {
+        "type": "/type/datetime",
+        "value": "2020-12-08T15:43:34.899170"
+    }
+}
