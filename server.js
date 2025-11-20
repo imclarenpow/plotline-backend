@@ -3,11 +3,11 @@ require('dotenv').config();
 const fastify = require('fastify')({ logger: true })
 
 // DB plugin
-fastify.register(require('./plugins/db'));
+fastify.register(require('./src/plugins/db'));
 
 // Routes
-fastify.register(require('./routes/books'));
-fastify.register(require('./routes/users'));
+fastify.register(require('./src/routes/books'));
+fastify.register(require('./src/routes/users'));
 
 // test route
 fastify.get('/api/test', (req, reply) => reply.send({ hello: 'world' }));

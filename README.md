@@ -66,3 +66,67 @@ GET /api/books/olid/OL453735W
   ]
 }
 ```
+# Plotline DB
+
+This is the folder containing db information and scripts.
+
+## Setting up the Container
+
+Set up the DB where you want. I've created a MySQL docker container because this is the easiest way to get the db setup.
+As I already had portainer setup, I just created a new stack and pasted this into the editor (with the username and password).
+
+```
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: plotline-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root-password-here
+      MYSQL_DATABASE: plotline
+      MYSQL_USER: username
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
+```
+
+Then, we log into the container as the root user and create our account so we can access the DB on any machine on the network (as I have the server running on my homelab).
+
+## Accessing MySQL locally
+
+I'm running my db on my homelab. In order to gain access I've done 2 things. First I log into the container via SSH then I ran the following commands as the root user:
+`ALTER USER 'username'@'192.168.1.%' IDENTIFIED BY 'password';`
+`GRANT ALL PRIVILEGES ON plotline_prd.* TO 'username'@'192.168.1.%';` Note: add the exact db to be clearer. You might want to run the first step of creating the DB beforehand in order to select the db
+`FLUSH PRIVILEGES;`
+
+Once I'd done that I installed the SQLTools and SQLTools MariaDB, MySQL, TiDB extensions.
+Then I opened SQLTools → “New Connection”.
+
+- Fill in:
+- Connection Name: Plotline MySQL
+- Server/Host: 192.168.1.200 (my server IP)
+- Port: 3306
+- Username: username
+- Password: password
+- Database: plotline_prd (this is the one i'm using for now)
+- Tested the connection.
+
+Then I went ahead and looked at my SQL scripts to see if I could run them and I could so that is cool.
+
+## Creating the Database
+
+Create a new db:
+`CREATE DATABASE IF NOT EXISTS plotline_prd;`
+`USE plotline_prd;`
+Then run the scripts in this order:
+
+1. `./creation/initial-book-tables.sql`
+2. `./creation/initial-user-tables.sql`
+3. `./creation/initial-shelf-tables.sql`

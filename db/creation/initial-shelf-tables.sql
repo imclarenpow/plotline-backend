@@ -1,0 +1,19 @@
+-- Shelf tables
+CREATE TABLE IF NOT EXISTS shelves (
+    id BINARY(16) DEFAULT (UUID_TO_BIN(UUID(), 1)),
+    owner_id BINARY(16) NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    bio TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    FOREIGN KEY (owner_id) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS shelf_books(
+    shelf_id BINARY(16) NOT NULL,
+    book_id BINARY(16) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (shelf_id, book_id),
+    FOREIGN KEY (shelf_id) REFERENCES shelves(id) ON DELETE CASCADE,
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+);
