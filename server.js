@@ -18,4 +18,4 @@ fastify.listen({ port: process.env.BACKEND_PORT }, (err) => {
     fastify.log.error(err)
     process.exit(1)
   }
-})
+});

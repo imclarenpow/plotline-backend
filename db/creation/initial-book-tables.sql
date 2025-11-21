@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS books (
 -- open libary table. makes sense to have the work id as the PK.
 CREATE TABLE IF NOT EXISTS books_ol (
     work_id VARCHAR(20) UNIQUE NOT NULL,
-    books_id BINARY(16) NOT NULL,
+    book_id BINARY(16) NOT NULL,
     cover_id VARCHAR(20),
     PRIMARY KEY (work_id),
     FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE

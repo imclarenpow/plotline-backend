@@ -72,32 +72,35 @@ This is the folder containing db information and scripts.
 
 ## Setting up the Container
 
-Set up the DB where you want. I've created a MySQL docker container because this is the easiest way to get the db setup.
-As I already had portainer setup, I just created a new stack and pasted this into the editor (with the username and password).
+Set up the DB where you want. I've made a docker container because this is the easiest way to get the DBs setup.
 
+You need to create `.env` in the root. It also has data for the server too.
+Here is the template:
+``` yml
+# DB Details
+MYSQL_DB_NAME=plotline_prd # keep this the same. this is whatever DB is being used.
+MYSQL_ROOT_PASSWORD=rootpasswordhere
+MYSQL_USER=yourusername
+MYSQL_PASSWORD=yourpassword
+REDIS_PASSWORD=redispassword
+REDIS_PORT=6397
+
+ROOT_DIR=/mnt/mediadrive/plotline # this dir is wherever you want your db to be stored on the system.
+DB_DIR=${ROOT_DIR}/db/data
+MYSQL_DB_DIR=${DB_DIR}/mysql
+REDIS_DB_DIR=${DB_DIR}/redis
+
+# DB Host
+DB_HOST=192.168.1.200 # this probably should be localhost if you set up the containers on your machine.
+
+# Backend
+BACKEND_PORT=3001
 ```
-version: "3.9"
 
-services:
-  mysql:
-    image: mysql:8
-    container_name: plotline-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: root-password-here
-      MYSQL_DATABASE: plotline
-      MYSQL_USER: username
-      MYSQL_PASSWORD: password
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
+Then you need to add the pw
 
-volumes:
-  mysql_data:
-```
-
-Then, we log into the container as the root user and create our account so we can access the DB on any machine on the network (as I have the server running on my homelab).
+From the root run
+`docker-compose -f db/docker/docker-compose.yml up -d`
 
 ## Accessing MySQL locally
 

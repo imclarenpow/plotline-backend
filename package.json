@@ -2,9 +2,11 @@
   "type": "commonjs",
   "dependencies": {
     "@fastify/mysql": "^5.0.2",
+    "@fastify/redis": "^7.1.0",
     "dotenv": "^17.2.3",
     "fastify": "^5.6.1",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "redis": "^5.10.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
