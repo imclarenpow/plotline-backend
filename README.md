@@ -100,7 +100,7 @@ BACKEND_PORT=3001
 Then you need to add the pw
 
 From the root run
-`docker-compose -f db/docker/docker-compose.yml up -d`
+`docker-compose -f db/docker/docker-compose.yml --env-file .env config`
 
 ## Accessing MySQL locally
 

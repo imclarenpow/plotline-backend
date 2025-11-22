@@ -5,7 +5,7 @@ const createBook = `
 `
 // seperate in the case where OL is no longer used.
 const createBook_Ol = `
-    INSERT INTO books_ol (books_id, work_id, cover_id)
+    INSERT INTO books_ol (book_id, work_id, cover_id)
     VALUES (?, ?, ?)  
 `
 

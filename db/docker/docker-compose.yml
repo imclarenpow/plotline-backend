@@ -1,6 +1,5 @@
 # Docker Compose file for DBs
-env_file:
-  - .env
+name: plotline-databases
 services:
   mysql:
     image: mysql:8

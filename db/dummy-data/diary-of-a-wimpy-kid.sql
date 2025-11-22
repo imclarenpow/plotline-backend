@@ -29,13 +29,13 @@ VALUES (
         224,
         19800
     );
-INSERT INTO books_ol (books_id, work_id, cover_id)
+INSERT INTO books_ol (book_id, work_id, cover_id)
 VALUES (
         @diary_of_a_wimpy_kid,
         'OL8483260W',
         'OL36660032M'
     );
-INSERT INTO book_authors (author_id, books_id)
+INSERT INTO book_authors (author_id, book_id)
 VALUES(@jeff_kinney, @diary_of_a_wimpy_kid);
 -- Create a follow up book
 SET @wrecking_ball = UUID_TO_BIN(UUID(), 1);
@@ -48,13 +48,13 @@ VALUES (
         220,
         19
     );
-INSERT INTO books_ol (books_id, work_id, cover_id)
+INSERT INTO books_ol (book_id, work_id, cover_id)
 VALUES (
         @wrecking_ball,
         'OL20465177W',
         'OL27918055M'
     );
-INSERT INTO book_authors (author_id, books_id)
+INSERT INTO book_authors (author_id, book_id)
 VALUES(@jeff_kinney, @wrecking_ball);
 -- Create another follow up book
 SET @the_long_haul = UUID_TO_BIN(UUID(), 1);
@@ -67,11 +67,11 @@ VALUES (
         218,
         2800
     );
-INSERT INTO books_ol (books_id, work_id, cover_id)
+INSERT INTO books_ol (book_id, work_id, cover_id)
 VALUES (
         @the_long_haul,
         'OL17076678W',
         'OL27918055M'
     );
-INSERT INTO book_authors (author_id, books_id)
+INSERT INTO book_authors (author_id, book_id)
 VALUES(@jeff_kinney, @the_long_haul);

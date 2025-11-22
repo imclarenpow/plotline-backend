@@ -19,7 +19,7 @@ const getAuthorBooksBase = `
     FROM books b
     JOIN book_authors ba ON ba.book_id = b.id
     JOIN authors a ON a.id = ba.author_id
-    LEFT JOIN books_ol bo ON bo.books_id = b.id
+    LEFT JOIN books_ol bo ON bo.book_id = b.id
 `
 // get by id
 const getAuthorBooksById = getAuthorBooksBase + `
