@@ -123,7 +123,7 @@ Then I opened SQLTools → “New Connection”.
 
 Then I went ahead and looked at my SQL scripts to see if I could run them and I could so that is cool.
 
-## Creating the Database
+## Creating the SQL Database
 
 Create a new db:
 `CREATE DATABASE IF NOT EXISTS plotline_prd;`
@@ -133,3 +133,12 @@ Then run the scripts in this order:
 1. `./creation/initial-book-tables.sql`
 2. `./creation/initial-user-tables.sql`
 3. `./creation/initial-shelf-tables.sql`
+
+## Accessing Redis locally
+
+I'm also running my Redis instance on my server and I am using the Redis for VS Code to access it.
+Then I put the details in:
+Host: (server ip)
+Database Alias: (serverip):(redis port)
+Username: empty
+Password: password from env.
