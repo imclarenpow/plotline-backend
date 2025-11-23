@@ -57,5 +57,5 @@ async function cleanAuthorOlids(authorArray) {
 }
 
 module.exports = {
-    cleanAuthorOlid, transformAuthorOLDataToDBFormat, transformBookOLDataToDBFormat, cleanAuthorOlids
+    cleanAuthorOlid, transformAuthorOLDataToDBFormat, transformBookOLDataToDBFormat, cleanAuthorOlids, cleanWorkOlid
 };

@@ -58,5 +58,5 @@ async function createBookFromOLData(db, bookData, uuid) {
 }
 
 module.exports = {
-    getBookByWorkId, createBookFromOLData, createBookAuthorRow
+    getBookById, getBookByWorkId, createBookFromOLData, createBookAuthorRow
 };

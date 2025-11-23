@@ -1,16 +1,139 @@
 # Plotline Backend
 
-Using node & fastify.
-Fastify is supposed to be faster and ify-er than express so we're giving this a shot.
-To run, install dependencies `npm install`, then run `node server.js` this will start the backend.
-(Probably need a better way of doing this)
+A fast, modern book management API built with **Node.js** and **Fastify**.
 
-## Structure
+## Quick Start
 
-Endpoint starts in `routes`.
-Routes call methods from `services` which in turn call queries from `queries`.
+```bash
+npm install
+npm start
+```
 
-## Endpoints
+This starts the backend on the port specified in your `.env` file.
+
+---
+
+## Table of Contents
+
+1. [Project Structure](#project-structure)
+2. [Environment Setup](#environment-setup)
+3. [Docker & Database Setup](#docker--database-setup)
+4. [API Endpoints](#api-endpoints)
+
+---
+
+## Project Structure
+
+```
+routes/     → API endpoints
+services/   → Business logic
+queries/    → Database queries
+plugins/    → Fastify plugins (DB, Redis)
+```
+
+**Flow**: Routes → Services → Queries → Database
+
+---
+
+## Environment Setup
+
+Create a `.env` file in the root directory with:
+
+```env
+# Database
+MYSQL_DB_NAME=plotline_prd
+MYSQL_ROOT_PASSWORD=rootpasswordhere
+MYSQL_USER=yourusername
+MYSQL_PASSWORD=yourpassword
+
+# Redis
+REDIS_PASSWORD=redispassword
+REDIS_PORT=6379
+
+# Storage
+ROOT_DIR=/mnt/mediadrive/plotline
+DB_DIR=${ROOT_DIR}/db/data
+MYSQL_DB_DIR=${DB_DIR}/mysql
+REDIS_DB_DIR=${DB_DIR}/redis
+
+# Server
+DB_HOST=192.168.1.200
+BACKEND_PORT=3001
+```
+
+---
+
+## Docker & Database Setup
+
+### Starting the Containers
+
+```bash
+docker-compose -f db/docker/docker-compose.yml --env-file .env up -d
+```
+
+### Verify Configuration
+
+```bash
+docker-compose -f db/docker/docker-compose.yml --env-file .env config
+```
+
+### Creating the Database
+
+Connect to MySQL:
+
+```bash
+docker exec -it plotline-mysql mysql -u root -p
+```
+
+Then run:
+
+```sql
+CREATE DATABASE IF NOT EXISTS plotline_prd;
+USE plotline_prd;
+```
+
+Run SQL scripts in order:
+
+1. `./db/creation/initial-book-tables.sql`
+2. `./db/creation/initial-user-tables.sql`
+3. `./db/creation/initial-shelf-tables.sql`
+
+### Granting Remote Access (for homelab setups)
+
+If running MySQL on a remote server, connect to the container and run:
+
+```sql
+ALTER USER 'yourusername'@'192.168.1.%' IDENTIFIED BY 'yourpassword';
+GRANT ALL PRIVILEGES ON plotline_prd.* TO 'yourusername'@'192.168.1.%';
+FLUSH PRIVILEGES;
+```
+
+### Connecting from Your PC
+
+**Using VS Code (SQLTools extension)**:
+- Install `SQLTools` and `SQLTools MySQL`
+- Create a new connection:
+  - Host: `192.168.1.200` (your server IP)
+  - Port: `3306`
+  - Username: `yourusername`
+  - Password: `yourpassword`
+  - Database: `plotline_prd`
+
+**Using Command Line**:
+```bash
+mysql -h 192.168.1.200 -u yourusername -p
+```
+
+**Using Redis**:
+- Install `Redis` extension for VS Code
+- Add connection with:
+  - Host: your server IP
+  - Port: `6379`
+  - Password: from `.env` REDIS_PASSWORD
+
+---
+
+## API Endpoints
 
 ### GET /api/books/olid/:worksOlid
 
@@ -66,79 +189,4 @@ GET /api/books/olid/OL453735W
   ]
 }
 ```
-# Plotline DB
 
-This is the folder containing db information and scripts.
-
-## Setting up the Container
-
-Set up the DB where you want. I've made a docker container because this is the easiest way to get the DBs setup.
-
-You need to create `.env` in the root. It also has data for the server too.
-Here is the template:
-``` yml
-# DB Details
-MYSQL_DB_NAME=plotline_prd # keep this the same. this is whatever DB is being used.
-MYSQL_ROOT_PASSWORD=rootpasswordhere
-MYSQL_USER=yourusername
-MYSQL_PASSWORD=yourpassword
-REDIS_PASSWORD=redispassword
-REDIS_PORT=6397
-
-ROOT_DIR=/mnt/mediadrive/plotline # this dir is wherever you want your db to be stored on the system.
-DB_DIR=${ROOT_DIR}/db/data
-MYSQL_DB_DIR=${DB_DIR}/mysql
-REDIS_DB_DIR=${DB_DIR}/redis
-
-# DB Host
-DB_HOST=192.168.1.200 # this probably should be localhost if you set up the containers on your machine.
-
-# Backend
-BACKEND_PORT=3001
-```
-
-Then you need to add the pw
-
-From the root run
-`docker-compose -f db/docker/docker-compose.yml --env-file .env config`
-
-## Accessing MySQL locally
-
-I'm running my db on my homelab. In order to gain access I've done 2 things. First I log into the container via SSH then I ran the following commands as the root user:
-`ALTER USER 'username'@'192.168.1.%' IDENTIFIED BY 'password';`
-`GRANT ALL PRIVILEGES ON plotline_prd.* TO 'username'@'192.168.1.%';` Note: add the exact db to be clearer. You might want to run the first step of creating the DB beforehand in order to select the db
-`FLUSH PRIVILEGES;`
-
-Once I'd done that I installed the SQLTools and SQLTools MariaDB, MySQL, TiDB extensions.
-Then I opened SQLTools → “New Connection”.
-
-- Fill in:
-- Connection Name: Plotline MySQL
-- Server/Host: 192.168.1.200 (my server IP)
-- Port: 3306
-- Username: username
-- Password: password
-- Database: plotline_prd (this is the one i'm using for now)
-- Tested the connection.
-
-Then I went ahead and looked at my SQL scripts to see if I could run them and I could so that is cool.
-
-## Creating the SQL Database
-
-Create a new db:
-`CREATE DATABASE IF NOT EXISTS plotline_prd;`
-`USE plotline_prd;`
-Then run the scripts in this order:
-
-1. `./creation/initial-book-tables.sql`
-2. `./creation/initial-user-tables.sql`
-3. `./creation/initial-shelf-tables.sql`
-
-## Accessing Redis locally
-
-I'm also running my Redis instance on my server and I am using the Redis for VS Code to access it.
-Then I put the details in:
-Host: (server ip)
-Database Alias: (serverip):(redis port)
-Username: empty
-Password: password from env.

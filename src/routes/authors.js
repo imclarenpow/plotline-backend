@@ -9,7 +9,7 @@ module.exports = async function (fastify, opts) {
         try {
             const author = await authorService.getAuthorByOlid(fastify.mysql, req.params.authorOlid);
             reply.send(author);
-        }catch(err){
+        } catch (err) {
             reply.code(500).send({ error: err.message });
         }
     });
