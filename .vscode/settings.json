@@ -12,7 +12,8 @@
             "driver": "MySQL",
             "name": "Plotline",
             "database": "plotline",
-            "username": "imclarenpow"
+            "username": "imclarenpow",
+            "askForPassword": true
         }
     ]
 }
