@@ -11,5 +11,5 @@ async function testConnection() {
 }
 
 export {
-    testConnection
+    testConnection, client as redis
 };

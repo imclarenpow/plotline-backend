@@ -42,6 +42,10 @@ REDIS_DB_DIR=${DB_DIR}/redis
 # Server
 DB_HOST=192.168.1.200
 BACKEND_PORT=3001
+
+# User Agent & Other Settings
+APP_NAME=Plotline/Testing
+APP_EMAIL_CONTACT=example@mail.com
 ```
 
 ---
