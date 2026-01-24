@@ -11,5 +11,5 @@ async function testConnection() {
 }
 
 export {
-    testConnection
+    mysql, testConnection
 };

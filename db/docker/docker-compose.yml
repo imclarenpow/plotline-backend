@@ -1,0 +1,26 @@
+# Docker Compose file for DBs
+name: plotline-databases
+services:
+  mysql:
+    image: mysql:8
+    container_name: plotline-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?missing}
+      MYSQL_DATABASE: plotline
+      MYSQL_USER: ${MYSQL_USER:?missing}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?missing}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ${MYSQL_DB_DIR}:/var/lib/mysql
+
+  redis:
+    image: redis:8.4.0-alpine
+    container_name: plotline-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?missing}"]
+    ports:
+      - ${REDIS_PORT?:missing}:${REDIS_PORT?:missing}
+    volumes:
+      - ${REDIS_DB_DIR:?missing}:/data
