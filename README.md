@@ -40,10 +40,10 @@ MYSQL_DB_DIR=${DB_DIR}/mysql
 REDIS_DB_DIR=${DB_DIR}/redis
 
 # Server
-DB_HOST=192.168.1.200
+DB_HOST=192.168.1.123
 BACKEND_PORT=3001
 ```
-
+Note: you can set DB_HOST to localhost if you are running the db on the same machine.
 ---
 
 ## Docker & Database Setup
@@ -96,7 +96,7 @@ FLUSH PRIVILEGES;
 **Using VS Code (SQLTools extension)**:
 - Install `SQLTools` and `SQLTools MySQL`
 - Create a new connection:
-  - Host: `192.168.1.200` (your server IP)
+  - Host: `192.168.1.123` (your server IP, make it localhost if running on same machine)
   - Port: `3306`
   - Username: `yourusername`
   - Password: `yourpassword`
@@ -104,7 +104,7 @@ FLUSH PRIVILEGES;
 
 **Using Command Line**:
 ```bash
-mysql -h 192.168.1.200 -u yourusername -p
+mysql -h 192.168.1.123 -u yourusername -p
 ```
 
 **Using Redis**:
