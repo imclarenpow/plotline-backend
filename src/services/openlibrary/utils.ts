@@ -25,7 +25,7 @@ export async function processSearchResults(payload: any): Promise<void> {
         const existingInfo = await redisLookup.getWorksSearchInfo(`${work}`);
 
         if (!existingInfo) {
-            redisMutations.setWorksSearchInfo(`${work}`, transformBookOLDataToDBFormat(doc));
+            redisMutations.setWorksSearchInfo(`${work}`, await transformBookOLDataToDBFormat(doc));
         }
     }
 }
