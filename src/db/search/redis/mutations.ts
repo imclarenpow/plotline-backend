@@ -19,12 +19,12 @@ export async function setWorksSearchInfo(work: string, payload: any) {
     const value = JSON.stringify(payload);
     console.log('[REDIS] Caching works value:', value);
     console.log('[REDIS] Value prior to stringify:', payload);
-    // TODO: Fix the value so that it is properly set in redis.
     try {
         await redis.set(key, value);
         await redis.expire(key, ttl);
     } catch (error) {
-        console.error('[REDIS] Error caching works search info:', error);
+        console.error(`[REDIS] Error caching works search info. Removing key ${key}`, error);
+        await redis.del(key);
         throw error;
     }
 }
