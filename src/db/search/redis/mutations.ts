@@ -17,8 +17,6 @@ export async function setSearchQuery(query: string, payload: any) {
 export async function setWorksSearchInfo(work: string, payload: any) {
     const key = `${searchWorksPrefix}:${work}`;
     const value = JSON.stringify(payload);
-    console.log('[REDIS] Caching works value:', value);
-    console.log('[REDIS] Value prior to stringify:', payload);
     try {
         await redis.set(key, value);
         await redis.expire(key, ttl);

@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "start": "bun run ./src/index.ts",
-    "dev": "bun --watch run ./src/index.ts"
+    "dev": "bun --watch run ./src/index.ts",
+    "git-test": "bun test --exclude \"**/bindings/**\" src/**/*.test.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

@@ -40,6 +40,7 @@ export async function search(query: string, number_returned: number): Promise<an
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Failed to search for ${query}: ${res.status}`);
         const data = await res.json() as { docs?: any[] };
+        console.log(`Data Dump: ${JSON.stringify(data)}`);
         return data;
     } catch (error) {
         throw error;

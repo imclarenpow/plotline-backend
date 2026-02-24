@@ -1,4 +1,4 @@
-# plotline-backend-bun-port
+# Plotline Backend
 
 To install dependencies:
 
@@ -97,6 +97,8 @@ FLUSH PRIVILEGES;
 
 ### Connecting from Your PC
 
+Couple of options here, you can use DBeaver or SQLTools. DBeaver is alot more comprehensive (use similar details as below).
+
 **Using VS Code (SQLTools extension)**:
 - Install `SQLTools` and `SQLTools MySQL`
 - Create a new connection:
@@ -114,6 +116,6 @@ mysql -h 192.168.1.123 -u yourusername -p
 **Using Redis**:
 - Install `Redis` extension for VS Code
 - Add connection with:
-  - Host: your server IP
+  - Host: `192.168.1.123` (your server IP, make it localhost if running on same machine)
   - Port: `6379`
   - Password: from `.env` REDIS_PASSWORD

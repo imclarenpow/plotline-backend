@@ -9,7 +9,7 @@ import { jsonResponse } from '../utils/api.ts';
 // should consider adding a locking mechanism or queue to handle this.
 export async function searchHandler(query: string, limit: number = searchItemLimit) {
     const cachedData = await getSearchQuery(query);
-
+    console.log(`/api/search/${query} - Cache ${cachedData ? 'hit' : 'miss'}`);
     if (cachedData) {
         return jsonResponse(cachedData);
     } else {
