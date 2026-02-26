@@ -1,5 +1,4 @@
 import { getWork } from '../services/openlibrary/client.ts';
-import { searchItemLimit } from '../config/search.ts';
 import { getWorksSearchInfo } from '../db/search/redis/lookups.ts';
 import { setWorksSearchInfo } from '../db/search/redis/mutations.ts';
 import { jsonResponse } from '../utils/api.ts';
