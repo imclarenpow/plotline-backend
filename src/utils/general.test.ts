@@ -1,5 +1,5 @@
-import { expect, test, describe } from "bun:test";
-import { cleanString } from "./general.ts";
+import { expect, test, describe } from 'bun:test';
+import { cleanString } from './general.ts';
 
 describe("cleanString", () => {
     test("should remove leading and trailing whitespace", async () => {
