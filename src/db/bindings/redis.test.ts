@@ -1,5 +1,5 @@
-import { expect, test, describe } from "bun:test";
-import { testConnection } from "./redis.ts";
+import { expect, test, describe } from 'bun:test';
+import { testConnection } from './redis.ts';
 
 describe("Redis Connection", () => {
     test("should return pong response from Redis", async () => {
