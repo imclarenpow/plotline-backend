@@ -7,7 +7,7 @@ import { jsonResponse } from '../utils/api.ts';
 
 // TODO: may cause race conditions if multiple requests for the same query come in simultaneously.
 // should consider adding a locking mechanism or queue to handle this.
-export async function bookWorkHandler(query: string, limit: number = searchItemLimit) {
+export async function bookWorkHandler(query: string) {
     const cachedData = await getWorksSearchInfo(query);
     console.log(`/api/books/${query} - Cache ${cachedData ? 'hit' : 'miss'}`);
     if (cachedData) {

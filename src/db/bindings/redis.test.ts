@@ -6,9 +6,4 @@ describe("Redis Connection", () => {
         const result = await testConnection();
         expect(result).toBe("PONG");
     });
-
-    test("should handle connection errors gracefully", async () => {
-        const result = await testConnection();
-        expect(result).toBeDefined();
-    });
 });
