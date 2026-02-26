@@ -5,7 +5,17 @@ export async function getSearchQuery(query: string): Promise<any | null> {
     const key = `${searchPrefix}:${query}`;
     const value = await redis.get(key);
     if (value) {
-        return JSON.parse(value);
+        try {
+            return JSON.parse(value);
+        } catch (e) {
+            try {
+                await redis.del(key); // remove corrupted cache entry
+            } catch (delError) {
+                console.error('[REDIS] Error deleting corrupted cache entry:', delError);
+            }
+            console.error('[REDIS] Error parsing cached search query:', e);
+            return null;
+        }
     } else {
         return null;
     }

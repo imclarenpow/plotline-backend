@@ -6,7 +6,7 @@ const connectionString = `mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@${DB_HOST}:${M
 const mysql = new SQL(connectionString);
 
 async function testConnection() {
-    const result = await mysql`SELECT * FROM books`;
+    const result = await mysql`SELECT 1 AS ok`;
     return result;
 }
 

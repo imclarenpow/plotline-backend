@@ -4,7 +4,9 @@ import * as redisLookup from '../../db/search/redis/lookups.ts';
 import * as redisMutations from '../../db/search/redis/mutations.ts';
 
 export async function transformBookOLDataToDBFormat(bookData: any): Promise<any> {
-    if (!bookData) throw new Error("No book data provided");
+    if (!bookData) {
+        throw new Error("No book data provided");
+    }
     return {
         title: await utils.cleanString(bookData.title) || null,
         bio: await utils.cleanString(bookData.description) || null,
@@ -20,12 +22,12 @@ export async function cleanWorkOlid(raw: string): Promise<string> {
 }
 
 export async function processSearchResults(payload: any): Promise<void> {
-    for (const doc of payload.docs) {
+    for (const doc of (Array.isArray(payload?.docs) ? payload.docs : [])) {
         const work = await cleanWorkOlid(doc.key);
         const existingInfo = await redisLookup.getWorksSearchInfo(`${work}`);
 
         if (!existingInfo) {
-            redisMutations.setWorksSearchInfo(`${work}`, await transformBookOLDataToDBFormat(doc));
+            await redisMutations.setWorksSearchInfo(`${work}`, await transformBookOLDataToDBFormat(doc));
         }
     }
 }

@@ -17,14 +17,11 @@ export async function setSearchQuery(query: string, payload: any) {
 export async function setWorksSearchInfo(work: string, payload: any) {
     const key = `${searchWorksPrefix}:${work}`;
     const value = JSON.stringify(payload);
-    console.log('[REDIS] Caching works value:', value);
-    console.log('[REDIS] Value prior to stringify:', payload);
-    // TODO: Fix the value so that it is properly set in redis.
     try {
         await redis.set(key, value);
         await redis.expire(key, ttl);
     } catch (error) {
-        console.error('[REDIS] Error caching works search info:', error);
+        console.error(`[REDIS] Error caching works search info for key ${key}`, error);
         throw error;
     }
 }
