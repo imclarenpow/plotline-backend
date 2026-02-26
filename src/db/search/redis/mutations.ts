@@ -21,14 +21,7 @@ export async function setWorksSearchInfo(work: string, payload: any) {
         await redis.set(key, value);
         await redis.expire(key, ttl);
     } catch (error) {
-        console.error(`[REDIS] Error caching works search info. Removing key ${key}`, error);
-        // try catch in the case redis is just down
-        try {
-            await redis.del(key);
-        } catch (delError) {
-            console.error(`[REDIS] Error deleting key ${key} after failed setWorksSearchInfo. Maybe unreachable?`, delError);
-        }
-
+        console.error(`[REDIS] Error caching works search info for key ${key}`, error);
         throw error;
     }
 }
