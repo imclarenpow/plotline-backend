@@ -34,7 +34,7 @@ REDIS_PASSWORD=redispassword
 REDIS_PORT=6379
 
 # Storage
-ROOT_DIR=/mnt/mediadrive/plotline
+ROOT_DIR=/your/dir/here
 DB_DIR=${ROOT_DIR}/db/data
 MYSQL_DB_DIR=${DB_DIR}/mysql
 REDIS_DB_DIR=${DB_DIR}/redis
