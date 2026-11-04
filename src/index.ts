@@ -1,4 +1,4 @@
-import { bookWorkHandler } from './api/books.ts';
+import { bookWorkHandler, bookEditionHandler } from './api/books.ts';
 import { searchHandler } from './api/search.ts';
 
 const env = process.env;
@@ -32,6 +32,13 @@ const server = Bun.serve({
             try {
                 const result = await bookWorkHandler(`${req.params.query}`);
                 return result;
+            } catch (error: any) {
+                return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+            }
+        },
+        "/api/books/:query/editions": async req => {
+            try {
+                return await bookEditionHandler(`${req.params.query}`);
             } catch (error: any) {
                 return new Response(JSON.stringify({ error: error.message }), { status: 500 });
             }

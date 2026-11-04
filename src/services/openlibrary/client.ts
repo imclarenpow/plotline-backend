@@ -11,6 +11,14 @@ export async function getWork(workId: string): Promise<any> {
     if (!res.ok) throw new Error(`Failed to fetch work data for workId: ${workId}`);
     return await res.json();
 }
+// we could generalise these 2 functions but it is more readable to have them here.
+export async function getEditions(workId: string): Promise<any> {
+    const validated = WorkOlidSchema.safeParse(workId);
+    if (!validated.success) { throw new Error(`Invalid work ID: ${workId}`); }
+    const res = await fetch(`${ol.URL}/works/${workId}/editions.json?limit=100`, { headers: ol.userAgent });
+    if (!res.ok) throw new Error(`Failed to fetch editions for workId: ${workId}`);
+    return await res.json();
+}
 
 export async function getAuthor(authorId: string): Promise<any> {
     const validated = AuthorOlidSchema.safeParse(authorId);
