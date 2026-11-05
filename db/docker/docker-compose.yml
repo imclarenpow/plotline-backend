@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?missing}
-      MYSQL_DATABASE: plotline
+      MYSQL_DATABASE: ${MYSQL_DB_NAME:?missing}
       MYSQL_USER: ${MYSQL_USER:?missing}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?missing}
     ports:
@@ -21,6 +21,6 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?missing}"]
     ports:
-      - ${REDIS_PORT?:missing}:${REDIS_PORT?:missing}
+      - ${REDIS_PORT:?missing}:6379
     volumes:
       - ${REDIS_DB_DIR:?missing}:/data
