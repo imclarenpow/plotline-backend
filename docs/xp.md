@@ -1,60 +1,59 @@
 # Plotpoints (XP)
 
-Plotpoints for books are calculated from a subject-based heuristic.
+> **Status: designed, not built.** `src/utils/book/plotpoints.ts` is still empty. The data it needs is in place: `formats.density`, `subjects`, `subject_categories` and `work_signals`. The build order is in [todo.md](todo.md).
 
-## Overview
+XP rewards the **effort** of reading a book. Effort is mostly length, adjusted for how dense the format is and how hard the book is to read.
 
-Each book can have one or more subjects. Each subject has:
+## Formula
 
-1. A base difficulty value (`value`)
-2. A category (`audience`, `format`, `domain`, `metadata`)
-3. A category weight (`weight`) that scales the base value up or down
+```
+xp = f(pages) × density(format) × difficulty
+```
 
-The category weight represents how strongly that subject type reflects perceived reading difficulty.
+| Part | Source | Notes |
+|---|---|---|
+| `f(pages)` | `works.page_count` | Diminishing returns, e.g. `pages^0.8`, so a very long book doesn't dwarf everything else |
+| `density` | `formats.density` | prose 1.00, comic 0.60, manga 0.35, picture_book 0.20 (starting guesses). Unknown format uses 1.00, so a missed comic scores no worse than before formats existed |
+| `difficulty` | subjects, audience, ratings | A narrow multiplier, roughly 0.6–1.5 |
 
-## Core Formula
+Every stored score records its formula version in `works.xp_version`. XP already earned is copied into `user_reads.xp_awarded`, so changing the formula never changes a user's total.
 
-For each subject:
+## Difficulty
 
-$$
-weighted\_subject\_xp = subject\_value \times category\_weight
-$$
+### Subject weighting
+Each subject has a difficulty `value` (1–10) and a category with a `weight`:
 
-Then the book XP is derived from the weighted subject values (for example, sum or average depending on the final tuning strategy).
+| Category | Weight | Meaning |
+|---|---|---|
+| audience | 1.00 | Who the book is for (juvenile, primary readers, higher education). The strongest signal |
+| domain | 0.40 | Topic, e.g. History, Algebra |
+| format | 0.30 | Textbook, fiction type |
+| metadata | 0.10 | Descriptive context; near-zero effect |
 
-## Category Weighting Philosophy
+Combine subjects with a **weighted average**, so the weight controls how much a subject counts without changing its 1–10 scale:
 
-The weighting is intentionally opinionated:
+```
+subject_difficulty = Σ(value × weight) / Σ(weight)
+```
 
-1. `audience` has the highest weight
-2. `format` has moderate weight
-3. `domain` has lower-to-moderate weight
-4. `metadata` has very low (near-zero) weight
+Don't multiply each value by its weight and then average the results. That would make low-weight subjects pull the score *down* (a metadata subject worth 8 would become 0.8).
 
-Rationale:
+### Audience is a rule, not just a weight
+Only ~26 subjects are audience subjects, so most books never match one. When one does match, apply it as a cap or floor:
+- juvenile, children's or primary-reader subject → cap difficulty low
+- higher-education or textbook subject → raise the floor
 
-1. `audience` (for example, juvenile vs advanced audience) is the strongest signal of perceived difficulty.
-2. `format` (for example, textbook, reference, fiction type) can influence complexity, but less than audience.
-3. `domain` contributes some signal, but is not the dominant indicator by itself.
-4. `metadata` is mostly descriptive context and should have minimal effect on difficulty.
+Watch for topic subjects that look like audience subjects: `Children`, `Teenagers` and `Infants` can describe what a book is *about*.
 
-## Why Decimal Weights
+### Community ratings
+Once a work has enough rows in `difficulty_ratings`, blend them in. Over time they should outweigh subjects.
 
-Weights are decimal values so the model can be tuned gradually rather than in big jumps.
+## Known limitations of subject data
 
-This allows:
+- Subject values are bunched together (most domain subjects are 5–7), so subjects alone barely separate books.
+- Subjects describe topic, not reading difficulty: a popular history book and an academic monograph share subjects.
+- OpenLibrary subject strings are messy. Match on `subjects.normalized_name` after lowercasing and splitting on `--` and `,`.
 
-1. Fine-grained balancing over time
-2. Easy experimentation without changing the underlying subject scores
-3. Clear control over raising/lowering perceived difficulty per category
+## Calibration
 
-## Example (Illustrative)
-
-If a subject has `value = 6`:
-
-1. With `audience` weight `1.20` -> `7.2`
-2. With `format` weight `0.80` -> `4.8`
-3. With `domain` weight `0.55` -> `3.3`
-4. With `metadata` weight `0.10` -> `0.6`
-
-These are example values only; final weights should be calibrated with real catalog behavior.
+Tune against real books, not by feel. Keep a hand-labelled set of 50–100 books with expected XP ranges, from picture books to *Ulysses*, including comics and manga (e.g. *Diary of a Wimpy Kid*, *Watchmen*, a *One Piece* volume, *Dune*). Keep it as a test so formula changes can't silently regress.
