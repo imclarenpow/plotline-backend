@@ -1,7 +1,8 @@
-import { expect, test, describe } from 'bun:test';
+import { expect, test } from 'bun:test';
+import { describeDb } from '../testing.ts';
 import { testConnection } from './mysql.ts';
 
-describe("MySQL Connection", () => {
+describeDb("MySQL Connection", () => {
     test("should return query results from MySQL", async () => {
         const result = await testConnection();
         expect(result).toBeDefined();

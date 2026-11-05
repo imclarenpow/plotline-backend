@@ -1,6 +1,5 @@
 import * as ol from '../../config/openlibrary.ts';
 import { CoverSizeSchema } from '../../schemas/openlibrary.ts';
-import { BookSchema } from '../../schemas/books.ts';
 import { AuthorOlidSchema, WorkOlidSchema } from '../../schemas/openlibrary.ts';
 
 export async function getWork(workId: string): Promise<any> {

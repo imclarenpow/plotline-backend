@@ -6,7 +6,7 @@ Bun + TypeScript backend for the Plotline reading app. MySQL 8 for persistence, 
 
 ## Stack
 
-- **Runtime**: Bun (not Node.js) — use `bun:test`, `Bun.serve()`, `bun` SQL/Redis bindings
+- **Runtime**: Bun ≥ 1.4 (not Node.js) — use `bun:test`, `Bun.serve()`, `bun` SQL/Redis bindings. Bun 1.3.x's MySQL client does not roll back failed transactions and can hang the connection pool.
 - **Language**: TypeScript strict mode; `"module": "Preserve"` — imports must keep `.ts` extension
 - **Validation**: Zod — prefer `z.infer<>` for types derived from schemas
 - **DB**: MySQL via Bun's native `sql` template literals; no ORM
@@ -34,8 +34,9 @@ src/
   schemas/              ← Zod schemas + inferred types
   db/
     bindings/           ← MySQL and Redis client singletons
-    utils.ts            ← UUID binary conversion helpers
-    {domain}/
+    utils.ts            ← UUID/date conversion helpers, newUuid(), toExternalIds()
+    testing.ts          ← describeDb: DB tests run only under `bun run test:db`
+    {domain}/           ← works, contributors, shelves, search
       types.ts          ← Domain types (often re-exported from schemas)
       repo.ts           ← Domain repo; composes SQL modules + utils
       sql/
@@ -58,7 +59,7 @@ src/
 - **Compose, don't repeat** — SQL modules expose focused functions; repos compose them; handlers call repos
 - **Type via inference** — derive types from Zod schemas with `z.infer<>`; avoid maintaining parallel interface declarations
 - **Validate at boundaries** — use Zod `safeParse()` / `parse()` before calling external APIs or accepting user input; do not validate internal function calls between trusted layers
-- **Branded types** — use `UUID`, `DateString`, `RemoteId` from `src/db/types.ts` for fields that carry semantic meaning beyond their primitive type
+- **Branded types** — use `UUID`, `DateString`, `ExternalId` from `src/db/types.ts` for fields that carry semantic meaning beyond their primitive type
 
 ---
 
@@ -112,8 +113,12 @@ Cache lookup functions live in `src/db/{domain}/redis/lookups.ts`; write functio
 ## MySQL Conventions
 
 - Use Bun's tagged template literal: `` mysql`SELECT ...` ``
-- UUIDs are stored as binary(16); convert with `uuidToBinary()` on write, `binaryToUuid()` on read (from `src/db/utils.ts`)
-- Date strings use the `DateString` branded type via `assertDateString()`
+- UUIDs are stored as binary(16); generate with `newUuid()` (v7, time-ordered), convert with `uuidToBinary()` on write, `binaryToUuid()` on read (from `src/db/utils.ts`)
+- Date strings use the `DateString` branded type via `assertDateString()`; read DATE columns with `toDateString()`
+- The schema is source-agnostic: no `*_ol` tables. Facts from any provider link through `sources` (`work_external_ids`, `edition_external_ids`, `contributor_external_ids`, `work_signals`)
+- Lookup tables (`formats`, `contributor_roles`, `sources`, `subject_categories`) are referenced by name in SQL via subqueries, e.g. `(SELECT id FROM sources WHERE name = ${source})`
+- Mutations take an optional executor (`db: SQL = mysql`) so repos can compose them inside `mysql.begin(async tx => ...)`
+- Schema lives in `db/creation/` (numbered, run in order). Rebuild the dev database with `bun run db:reset` (refuses any database not ending in `_dev`); add `--no-dummy` to skip dummy data
 
 ---
 
@@ -130,15 +135,17 @@ Cache lookup functions live in `src/db/{domain}/redis/lookups.ts`; write functio
 ## Testing
 
 ```bash
-# Unit tests (excludes DB bindings)
+# Unit tests (DB tests are skipped)
 bun run test:git
 
-# DB binding tests (requires live MySQL + Redis)
+# DB tests: bindings + repo integration tests (requires live MySQL + Redis)
 bun run test:db
 ```
 
 - Use `bun:test` (`describe`, `test`, `expect`, `beforeAll`)
-- Use `describe.skip()` when an optional dependency (e.g. Redis) is unavailable — do not fail the suite
+- Wrap tests that need MySQL/Redis in `describeDb` from `src/db/testing.ts` — they skip unless `RUN_DB_TESTS=1` (set by `test:db`)
+- DB integration tests run against the dev database: use unique IDs and delete what they create in `afterAll`
+- `bun test` forces the UTC timezone, so timezone bugs won't show up in tests
 - All test functions should be `async`
 
 ---

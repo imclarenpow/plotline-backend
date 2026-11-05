@@ -13,23 +13,7 @@ export const SearchPayloadSchema = z.object({
     }))
 })
 
-// Remote Identifiers. To expand as we find further sources.
-export const RemoteSourceSchema = z.enum([
-    'goodreads', 'librarything', 'isni', 'wikidata',
-    'viaf', 'storygraph', 'amazon', 'musicbrainz',
-    'lc_naf', 'opac_sbn', 'gnd', 'bookbrainz',
-    'imdb', 'librivox', 'project_gutenberg', 'inventaire'
-]);
-
-export const RemoteIdSchema = z.object({
-    source: RemoteSourceSchema,
-    id: z.string()
-});
-
 export const CoverSizeSchema = z.enum(['S', 'M', 'L']);
 
-
 export type CoverSize = z.infer<typeof CoverSizeSchema>;
-export type RemoteSource = z.infer<typeof RemoteSourceSchema>;
-export type RemoteId = z.infer<typeof RemoteIdSchema>;
 export type WorkOlid = z.infer<typeof WorkOlidSchema>;

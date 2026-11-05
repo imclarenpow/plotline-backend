@@ -6,8 +6,9 @@
   "scripts": {
     "start": "bun run ./src/index.ts",
     "dev": "bun --watch run ./src/index.ts",
-    "test:git": "bun test --exclude \"**/bindings/**\" src/**/*.test.ts",
-    "test:db": "bun test src/db/bindings/*.test.ts"
+    "test:git": "bun test src",
+    "test:db": "RUN_DB_TESTS=1 bun test src/db",
+    "db:reset": "bun run db/reset.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
