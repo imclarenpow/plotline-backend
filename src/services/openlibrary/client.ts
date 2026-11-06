@@ -32,19 +32,19 @@ export async function getBookCover(coverId: number, size: string): Promise<strin
     const validated = CoverSizeSchema.safeParse(size);
     if (!validated.success) { throw new Error(`Invalid cover size: ${size}`); }
 
-    return `${ol.BOOK_COVERS_URL}/${coverId}-${size}`;
+    return `${ol.BOOK_COVERS_URL}${coverId}-${size}.jpg`;
 }
 
 export async function getAuthorCover(coverId: string, size: string): Promise<string> {
     const validated = CoverSizeSchema.safeParse(size);
     if (!validated.success) { throw new Error(`Invalid cover size: ${size}`); }
-    return `${ol.AUTHOR_COVERS_URL}/${coverId}-${size}`;
+    return `${ol.AUTHOR_COVERS_URL}${coverId}-${size}.jpg`;
 }
 
 export async function search(query: string, number_returned: number): Promise<any> {
     const url = `${ol.URL}/search.json?q=${encodeURIComponent(query)}&fields=${ol.SEARCH_PARAMS}&limit=${number_returned}`;
     try {
-        const res = await fetch(url);
+        const res = await fetch(url, { headers: ol.userAgent });
         if (!res.ok) throw new Error(`Failed to search for ${query}: ${res.status}`);
         const data = await res.json() as { docs?: any[] };
         return data;

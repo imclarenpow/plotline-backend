@@ -3,6 +3,7 @@ import { describeDb } from '../testing.ts';
 import { mysql } from '../bindings/mysql.ts';
 import * as works from './repo.ts';
 import * as contributors from '../contributors/repo.ts';
+import { SourceNameSchema } from '../../schemas/sources.ts';
 
 // Integration tests against the live dev database. Every record uses a unique suffix
 // and is deleted afterwards, so the tests can run against seeded data.
@@ -28,6 +29,12 @@ describeDb("seeded lookup tables", () => {
         expect(Number(counts.sources)).toBeGreaterThanOrEqual(5);
         expect(Number(counts.roles)).toBeGreaterThanOrEqual(1);
         expect(Number(counts.subjects)).toBeGreaterThan(900);
+    });
+
+    test("SourceNameSchema matches the rows in the sources table", async () => {
+        const rows = await mysql`SELECT name FROM sources ORDER BY name`;
+        const inDb = rows.map((r: { name: string }) => r.name);
+        expect([...SourceNameSchema.options].sort()).toEqual(inDb);
     });
 
     test("dummy data is reachable by OpenLibrary ID", async () => {
