@@ -1,5 +1,5 @@
-import { afterAll, expect, test } from 'bun:test';
-import { describeDb } from '../../testing.ts';
+import { expect, test } from 'bun:test';
+import { afterAllDb, describeDb } from '../../testing.ts';
 import { redis } from '../../bindings/redis.ts';
 import { searchPrefix, ttl } from '../../../config/redis.ts';
 import { getEditionsSearchInfo, getSearchQuery, getWorksSearchInfo } from './lookups.ts';
@@ -10,7 +10,7 @@ const suffix = `${Date.now()}`;
 const keys: string[] = [];
 const track = (key: string) => (keys.push(key), key);
 
-afterAll(async () => {
+afterAllDb(async () => {
     for (const key of keys) await redis.del(key);
 });
 

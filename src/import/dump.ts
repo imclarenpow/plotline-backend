@@ -5,6 +5,8 @@ import { createInterface } from 'node:readline';
 import { createGunzip } from 'node:zlib';
 import { ProgressBar } from './progress.ts';
 
+const FLUSH_EVERY_BYTES = 8 * 1024 * 1024;
+
 // Streams a (optionally gzipped) text file line by line, without loading it into memory.
 export async function* readLines(path: string): AsyncGenerator<string> {
     const file = createReadStream(path);
@@ -75,9 +77,16 @@ export async function downloadIfMissing(url: string, path: string, headers: Reco
     const partial = `${path}.part`;
     const file = Bun.file(partial).writer();
     try {
+        // Flush every few MB so a fast network can't buffer a multi-GB dump in memory.
+        let unflushed = 0;
         for await (const chunk of res.body) {
             file.write(chunk);
             progress.add(chunk.byteLength);
+            unflushed += chunk.byteLength;
+            if (unflushed >= FLUSH_EVERY_BYTES) {
+                await file.flush();
+                unflushed = 0;
+            }
         }
     } finally {
         await file.end();

@@ -59,6 +59,10 @@ export async function getWorksByContributor(contributorId: string): Promise<Cont
 export async function createWork(newWork: NewWork): Promise<Work> {
     const id = newUuid();
     await pg.begin(async tx => {
+        // format_id is nullable, so an unknown name would otherwise be stored as "format unknown".
+        if (newWork.format && !(await lookups.getFormatIdByName(newWork.format, tx)).length) {
+            throw new Error(`Unknown format: ${newWork.format}`);
+        }
         await mutations.insertWork(id, newWork, tx);
         for (const x of newWork.externalIds ?? []) {
             await mutations.insertWorkExternalId(id, x.source, x.id, tx);
@@ -73,10 +77,13 @@ export async function deleteWork(workId: string): Promise<void> {
 
 export async function getEditions(workId: string): Promise<Edition[]> {
     const rows = await lookups.getEditionsByWorkId(workId);
-    return Promise.all(rows.map(async (row: Row) => ({
+    if (!rows.length) return [];
+    const idRows = await lookups.getEditionExternalIds(rows.map((row: Row) => row.id));
+    const idsByEdition = Map.groupBy(idRows as { edition_id: string; source: string; id: string }[], row => row.edition_id);
+    return rows.map((row: Row) => ({
         ...rowToEdition(row),
-        externalIds: toExternalIds(await lookups.getEditionExternalIds(row.id)),
-    })));
+        externalIds: toExternalIds(idsByEdition.get(row.id) ?? []),
+    }));
 }
 
 export async function addEdition(workId: string, newEdition: NewEdition): Promise<Edition> {

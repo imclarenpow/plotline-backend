@@ -1,5 +1,5 @@
-import { afterAll, afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
-import { describeDb } from '../db/testing.ts';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { afterAllDb, describeDb } from '../db/testing.ts';
 import { redis } from '../db/bindings/redis.ts';
 import { bookEditionHandler, bookWorkHandler } from './books.ts';
 import { mergeResults, searchHandler } from './search.ts';
@@ -18,7 +18,7 @@ beforeEach(() => {
         Response.json({ from: 'openlibrary', url: String(url), docs: [] })) as any);
 });
 afterEach(() => fetchSpy.mockRestore());
-afterAll(async () => {
+afterAllDb(async () => {
     for (const key of keys) await redis.del(key);
 });
 

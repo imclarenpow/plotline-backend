@@ -13,6 +13,8 @@ import * as mutations from './sql/mutations.ts';
 type Row = Record<string, any>;
 export type BatchResult = { created: number; updated: number; skipped: number };
 const NOTHING: BatchResult = { created: 0, updated: 0, skipped: 0 };
+// work_contributors.position is SMALLINT.
+const MAX_CONTRIBUTOR_POSITION = 32_767;
 
 // Lookup-table IDs and publisher IDs, loaded once per process. Publishers repeat across
 // almost every batch, so caching them saves two queries per edition batch.
@@ -136,8 +138,7 @@ export async function importWorkContributors(source: SourceName, batch: ImportWo
     let skipped = 0;
     for (const link of links) {
         const workId = works.get(link.workExternalId);
-        // position is TINYINT UNSIGNED
-        link.contributorExternalIds.slice(0, 255).forEach((externalId, position) => {
+        link.contributorExternalIds.slice(0, MAX_CONTRIBUTOR_POSITION + 1).forEach((externalId, position) => {
             const contributorId = contributors.get(externalId);
             if (workId && contributorId) rows.push({ work_id: workId, contributor_id: contributorId, role_id: roles.get(link.role)!, position });
             else skipped++;

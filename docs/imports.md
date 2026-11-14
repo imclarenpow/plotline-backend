@@ -22,7 +22,7 @@ Dumps are saved in `IMPORT_DATA_DIR` (default `data/`, which is gitignored). Dow
 OpenLibrary publishes new dumps monthly. Re-running the import on a new dump adds new works, editions and authors, and fills fields that were empty (see the rules below). To make that a single command that's safe to schedule:
 
 - **Dumps are stored by date.** The `*_latest` URLs redirect to dated files such as `ol_dump_works_2026-10-31.txt.gz`, and that's the name they're saved under. `--download` asks where `latest` points (a HEAD request) and only downloads when that dated file isn't already in `data/`. An undated `*_latest` file from before this naming is renamed if it's the same size as the current dump, rather than downloaded again.
-- **A dump is imported once.** A full import records the dump's date in `import_runs.stats`, and a later run on the same dump stops with "already imported" unless you pass `--force`. Sample runs (`--limit`) don't record a date.
+- **A dump is imported once.** A full import records the dump's date in `import_runs.stats`, and a later run on the same dump stops with "already imported" unless you pass `--force`. Sample runs (`--limit`) don't record a date, and are ignored when checking.
 - **Old dumps are cleaned up.** After a successful full import, older dumps of each kind are deleted, unless you pass `--keep-old-dumps`. A failed or sample run deletes nothing.
 
 So a monthly `bun run import:openlibrary --download` does nothing until OpenLibrary publishes a new dump, then downloads it, imports it, and replaces the old files. Still to do: corrections to fields that are already set, redirects and deletions, and running on a schedule (see [todo.md](todo.md)).
@@ -52,7 +52,7 @@ Each run is recorded in `import_runs` with its status, per-step counts (`stats`)
 
 ## OpenLibrary
 
-Kept: editions with a valid ISBN whose language is in `OPENLIBRARY_LANGUAGES` (`eng`), plus their works and those works' authors. Editions with no language are left out unless `OPENLIBRARY_INCLUDE_NO_LANGUAGE` is set; the live search fallback still finds those books.
+Kept: editions with a valid ISBN where any listed language is in `OPENLIBRARY_LANGUAGES` (`eng`), plus their works and those works' authors. Editions with no language are left out unless `OPENLIBRARY_INCLUDE_NO_LANGUAGE` is set; the live search fallback still finds those books.
 
 The script makes five streaming passes, because each step needs IDs that an earlier one wrote:
 

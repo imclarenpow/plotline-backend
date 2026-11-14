@@ -46,7 +46,7 @@ src/
   schemas/          ← Zod schemas + inferred types (works, contributors, sources, ...)
   db/
     bindings/       ← Postgres (pg) and Redis singletons
-    utils.ts        ← newUuid, uuidToBinary/binaryToUuid, toDateString, toExternalIds
+    utils.ts        ← newUuid, toDateString, toExternalIds
     testing.ts      ← describeDb (DB tests only run under test:db)
     {domain}/       ← works, contributors, shelves, search, imports
       types.ts      ← re-exports from schemas
@@ -65,7 +65,7 @@ docs/               ← see the table above
 
 ## Coding practices
 
-- **Reuse helpers** (`jsonResponse`, `newUuid`, `uuidToBinary`, `binaryToUuid`, `toDateString`, `toExternalIds`) instead of writing the same logic again; extract shared logic rather than duplicating it
+- **Reuse helpers** (`jsonResponse`, `newUuid`, `toDateString`, `toExternalIds`) instead of writing the same logic again; extract shared logic rather than duplicating it
 - **Compose:** SQL modules expose focused functions, repos compose them, handlers call repos
 - **Validate at boundaries:** use Zod before calling external APIs or accepting user input, not between trusted internal layers
 - **Branded types:** `UUID`, `DateString` and `ExternalId` from `src/db/types.ts`

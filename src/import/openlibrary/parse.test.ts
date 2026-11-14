@@ -100,6 +100,16 @@ describe("parseEdition", () => {
         expect(parseEdition(none, { ...english, includeNoLanguage: true })?.language).toBeNull();
     });
 
+    test("keeps a multilingual edition if any of its languages is wanted", async () => {
+        const bilingual = JSON.stringify({ ...dune, languages: [{ key: '/languages/fre' }, { key: '/languages/eng' }] });
+        expect(mightBeWantedEdition(bilingual, english)).toBe(true);
+        expect(parseEdition(bilingual, english)?.language).toBe('eng');
+    });
+
+    test("strips NUL characters, which Postgres rejects", async () => {
+        expect(parseEdition(JSON.stringify({ ...dune, publishers: ['Ace\u0000 Books'] }), english)?.publisher).toBe('Ace Books');
+    });
+
     test("skips editions without a work, with a non-edition key, or with malformed JSON", async () => {
         expect(parseEdition(JSON.stringify({ ...dune, works: [] }), english)).toBeNull();
         expect(parseEdition(JSON.stringify({ ...dune, key: '/books/OL123' }), english)).toBeNull();
@@ -139,6 +149,11 @@ describe("parseWork", () => {
             },
             contributors: { workExternalId: 'OL893415W', contributorExternalIds: ['OL79034A', 'OL2A'], role: 'author' },
         });
+    });
+
+    test("strips NUL characters from descriptions", async () => {
+        const nul = { ...work, description: 'Arrakis\u0000 awaits' };
+        expect(parseWork(JSON.stringify(nul))?.work.description).toBe('Arrakis awaits');
     });
 
     test("skips works without a title", async () => {

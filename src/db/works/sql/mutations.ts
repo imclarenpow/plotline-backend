@@ -6,6 +6,7 @@ import type { NewEdition, NewWork } from '../types.ts';
 // Every mutation takes an optional executor so the repo can run several inside one transaction.
 // Lookup names (format, source, role) are resolved with subqueries; an unknown source or role
 // resolves to NULL and fails the NOT NULL constraint instead of being silently dropped.
+// format_id is nullable, so the repo checks the format name before calling insertWork.
 
 type WorkFields = Pick<NewWork, 'title' | 'subtitle' | 'description' | 'format' | 'firstPublishedYear' | 'pageCount'>;
 export function insertWork(id: string, d: WorkFields, db: SQL = pg) {

@@ -1,5 +1,5 @@
-import { afterAll, expect, test } from 'bun:test';
-import { describeDb } from '../testing.ts';
+import { expect, test } from 'bun:test';
+import { afterAllDb, describeDb } from '../testing.ts';
 import { pg } from '../bindings/postgres.ts';
 import * as works from './repo.ts';
 import * as contributors from '../contributors/repo.ts';
@@ -12,7 +12,7 @@ const workOlid = `OL${suffix}W`;
 const createdWorks: string[] = [];
 const createdContributors: string[] = [];
 
-afterAll(async () => {
+afterAllDb(async () => {
     for (const id of createdWorks) await works.deleteWork(id);
     for (const id of createdContributors) await contributors.deleteContributor(id);
 });

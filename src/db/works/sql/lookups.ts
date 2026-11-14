@@ -1,3 +1,4 @@
+import type { SQL } from 'bun';
 import { pg } from '../../bindings/postgres.ts';
 import type { SourceName } from '../../types.ts';
 
@@ -59,14 +60,19 @@ export function getEditionsByWorkId(workId: string) {
     `;
 }
 
-export function getEditionExternalIds(editionId: string) {
+// External IDs for several editions in one query; callers must not pass an empty array.
+export function getEditionExternalIds(editionIds: string[]) {
     return pg`
-        SELECT s.name AS source, x.external_id AS id
+        SELECT x.edition_id, s.name AS source, x.external_id AS id
         FROM edition_external_ids x
         JOIN sources s ON s.id = x.source_id
-        WHERE x.edition_id = ${editionId}
+        WHERE x.edition_id IN ${pg(editionIds)}
         ORDER BY s.priority DESC, s.name;
     `;
+}
+
+export function getFormatIdByName(name: string, db: SQL = pg) {
+    return db`SELECT id FROM formats WHERE name = ${name};`;
 }
 
 // Ordered by source priority so callers can take the first value they find per field.

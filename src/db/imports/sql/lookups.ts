@@ -8,13 +8,15 @@ export function getAllSourceIds(db: SQL = pg) {
     return db`SELECT id, name FROM sources;`;
 }
 
-// The dump date recorded by the source's most recent successful import run, if any.
+// The dump date recorded by the source's most recent successful full import run, if any.
+// Sample runs (--limit) succeed with no dump date, so they are skipped.
 export function getLastImportedDumpDate(source: string, db: SQL = pg) {
     return db`
         SELECT r.stats->'dump'->>'date' AS date
         FROM import_runs r
         JOIN sources s ON s.id = r.source_id
         WHERE s.name = ${source} AND r.status = 'succeeded'
+          AND r.stats->'dump'->>'date' IS NOT NULL
         ORDER BY r.started_at DESC
         LIMIT 1;
     `;

@@ -30,7 +30,7 @@ describe("newUuid", () => {
 
 describe("toDateString", () => {
     test("formats a Date by its local date parts as YYYY-MM-DD", async () => {
-        expect<string | null>(toDateString(new Date(1976, 6, 17))).toBe("1976-07-17");
+        expect<string | null>(toDateString(new Date(Date.UTC(1976, 6, 17)))).toBe("1976-07-17");
     });
 
     test("passes date strings through, dropping any time part", async () => {

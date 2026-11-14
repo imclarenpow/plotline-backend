@@ -22,13 +22,13 @@ export function assertDateString(date: string): DateString {
 }
 
 // Normalises a DATE value to "YYYY-MM-DD". SQL modules select dates as ::text, which passes
-// straight through; a Date object is read with its local date parts, since toISOString()
-// would shift the day in timezones ahead of UTC (e.g. NZ).
+// straight through. Bun returns a DATE as a Date at UTC midnight, so a Date object is read
+// with its UTC date parts; local parts would give the previous day west of UTC.
 export function toDateString(value: Date | string | null | undefined): DateString | null {
     if (value == null) return null;
     if (typeof value === "string") return assertDateString(value.slice(0, 10));
     const pad = (n: number) => String(n).padStart(2, "0");
-    return assertDateString(`${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`);
+    return assertDateString(`${value.getUTCFullYear()}-${pad(value.getUTCMonth() + 1)}-${pad(value.getUTCDate())}`);
 }
 
 // Turns `SELECT s.name AS source, x.external_id AS id` rows into plain ExternalId objects

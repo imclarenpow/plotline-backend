@@ -36,10 +36,13 @@ const StringList = z.array(z.unknown()).transform(xs => xs.filter((x): x is stri
 
 const MAX_DESCRIPTION = 20_000;
 
+// Postgres text types reject NUL (U+0000), and one bad row would fail its whole batch.
+const NUL = /\u0000/g;
+
 // Descriptions and bios: keeps line breaks, unlike clip().
 function textOf(value: z.infer<typeof TextValue> | undefined): string | null {
     if (value == null) return null;
-    const text = (typeof value === 'string' ? value : value.value).replace(/\r\n?/g, '\n').trim();
+    const text = (typeof value === 'string' ? value : value.value).replace(NUL, '').replace(/\r\n?/g, '\n').trim();
     return text ? text.slice(0, MAX_DESCRIPTION) : null;
 }
 
@@ -47,7 +50,7 @@ function textOf(value: z.infer<typeof TextValue> | undefined): string | null {
 // characters, so long values are clipped by code point rather than UTF-16 unit.
 function clip(text: string | null | undefined, max: number): string | null {
     if (!text) return null;
-    const clean = text.replace(/\s+/g, ' ').trim();
+    const clean = text.replace(NUL, '').replace(/\s+/g, ' ').trim();
     if (!clean) return null;
     return clean.length <= max ? clean : [...clean].slice(0, max).join('');
 }
@@ -157,7 +160,9 @@ export function parseEdition(json: string, filter: EditionFilter): ImportEdition
     const workKey = e.works?.[0]?.key;
     if (!workKey || olNumber(workKey, 'W') == null) return null;
 
-    const language = e.languages?.map(l => olId(l.key)).find(code => /^[a-z]{3}$/.test(code)) ?? null;
+    // A multilingual edition is kept if any of its languages is wanted, and stored under that one.
+    const languages = (e.languages ?? []).map(l => olId(l.key)).filter(code => /^[a-z]{3}$/.test(code));
+    const language = languages.find(code => filter.languages.includes(code)) ?? languages[0] ?? null;
     if (language ? !filter.languages.includes(language) : !filter.includeNoLanguage) return null;
 
     const isbn10 = (e.isbn_10 ?? []).map(normalizeIsbn10).find(Boolean) ?? null;
