@@ -3,6 +3,7 @@ import { createReadStream, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createGunzip } from 'node:zlib';
+import { ProgressBar } from './progress.ts';
 
 // Streams a (optionally gzipped) text file line by line, without loading it into memory.
 export async function* readLines(path: string): AsyncGenerator<string> {
@@ -56,18 +57,32 @@ export class IdSet {
     }
 }
 
-// Downloads `url` to `path` unless the file is already there. Streams to disk.
+// Downloads `url` to `path` unless the file is already there. Streams to disk chunk by
+// chunk with a progress bar, into `.part` first so an interrupted download is never
+// mistaken for a finished one.
 export async function downloadIfMissing(url: string, path: string, headers: Record<string, string>): Promise<void> {
     if (existsSync(path)) {
         console.log(`Using existing ${path}`);
         return;
     }
     mkdirSync(dirname(path), { recursive: true });
-    console.log(`Downloading ${url} ...`);
+    console.log(`Downloading ${url}`);
     const res = await fetch(url, { headers, redirect: 'follow' });
     if (!res.ok || !res.body) throw new Error(`Download failed (${res.status}): ${url}`);
+
+    const length = Number(res.headers.get('content-length'));
+    const progress = new ProgressBar(Number.isFinite(length) && length > 0 ? length : null);
     const partial = `${path}.part`;
-    await Bun.write(partial, res);
+    const file = Bun.file(partial).writer();
+    try {
+        for await (const chunk of res.body) {
+            file.write(chunk);
+            progress.add(chunk.byteLength);
+        }
+    } finally {
+        await file.end();
+    }
+    progress.done();
     renameSync(partial, path);
     console.log(`Saved ${path}`);
 }
