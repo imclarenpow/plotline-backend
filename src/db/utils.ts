@@ -1,4 +1,4 @@
-import type { DateString, UUID } from "./types.ts";
+import type { DateString, ExternalId, SourceName, UUID } from "./types.ts";
 
 export function assertDateString(date: string): DateString {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
@@ -21,21 +21,25 @@ export function assertDateString(date: string): DateString {
     return date as DateString;
 }
 
-export function binaryToUuid(bin: Buffer | Uint8Array): UUID {
-    if (!(bin instanceof Uint8Array || Buffer.isBuffer(bin))) {
-        throw new Error("Expected binary UUID");
-    }
-
-    const hex = Array.from(bin)
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-
-    const uuid = `${hex.substr(0, 8)}-${hex.substr(8, 4)}-${hex.substr(12, 4)}-${hex.substr(16, 4)}-${hex.substr(20, 12)}`;
-    return uuid as UUID;
+// Normalises a DATE value to "YYYY-MM-DD". SQL modules select dates as ::text, which passes
+// straight through; a Date object is read with its local date parts, since toISOString()
+// would shift the day in timezones ahead of UTC (e.g. NZ).
+export function toDateString(value: Date | string | null | undefined): DateString | null {
+    if (value == null) return null;
+    if (typeof value === "string") return assertDateString(value.slice(0, 10));
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return assertDateString(`${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`);
 }
 
-export function uuidToBinary(uuid: string | UUID): Buffer {
-    const hex = (uuid as string).replace(/-/g, "");
-    if (hex.length !== 32) throw new Error(`Invalid UUID string: ${uuid}`);
-    return Buffer.from(hex, "hex");
+// Turns `SELECT s.name AS source, x.external_id AS id` rows into plain ExternalId objects
+// (query results are arrays carrying extra metadata such as `count` and `command`).
+export function toExternalIds(rows: Iterable<{ source: string; id: string }>): ExternalId[] {
+    return Array.from(rows, row => ({ source: row.source as SourceName, id: row.id }));
 }
+
+// Time-ordered (v7) UUIDs keep primary-key inserts at the end of the index. Generated in the app
+// so a record's ID is known before it is inserted (the importer relies on this).
+export function newUuid(): UUID {
+    return Bun.randomUUIDv7() as UUID;
+}
+

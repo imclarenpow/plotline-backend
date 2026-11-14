@@ -1,33 +1,30 @@
-import * as utils from '../../utils/general.ts';
-import { ttl } from '../../config/redis.ts';
-import * as redisLookup from '../../db/search/redis/lookups.ts';
-import * as redisMutations from '../../db/search/redis/mutations.ts';
+import { bookCoverUrlById } from '../../config/openlibrary.ts';
+import { SearchDocSchema } from '../../schemas/openlibrary.ts';
+import type { SearchResult } from '../../schemas/search.ts';
 
-export async function transformBookOLDataToDBFormat(bookData: any): Promise<any> {
-    if (!bookData) {
-        throw new Error("No book data provided");
-    }
-    return {
-        title: await utils.cleanString(bookData.title) || null,
-        bio: await utils.cleanString(bookData.description) || null,
-        number_of_pages: bookData.number_of_pages || 0,
-        work_id: await cleanWorkOlid(bookData.key) || null,
-        cover_id: bookData.covers?.[0] || null,
-        sources: bookData.identifiers || {}
-    }
+// Any OpenLibrary key to its bare ID: '/works/OL123W' -> 'OL123W', '/authors/OL1A' -> 'OL1A'.
+export function olId(key: string): string {
+    return key.slice(key.lastIndexOf('/') + 1);
 }
 
-export async function cleanWorkOlid(raw: string): Promise<string> {
-    return raw.replace(/^\/works\//, '');
-}
-
-export async function processSearchResults(payload: any): Promise<void> {
-    for (const doc of (Array.isArray(payload?.docs) ? payload.docs : [])) {
-        const work = await cleanWorkOlid(doc.key);
-        const existingInfo = await redisLookup.getWorksSearchInfo(`${work}`);
-
-        if (!existingInfo) {
-            await redisMutations.setWorksSearchInfo(`${work}`, await transformBookOLDataToDBFormat(doc));
-        }
+// Maps an OpenLibrary search.json payload to search results. Docs that don't validate are skipped.
+export function toSearchResults(payload: unknown): SearchResult[] {
+    const docs = (payload as { docs?: unknown })?.docs;
+    const results: SearchResult[] = [];
+    for (const raw of Array.isArray(docs) ? docs : []) {
+        const parsed = SearchDocSchema.safeParse(raw);
+        if (!parsed.success) continue;
+        const doc = parsed.data;
+        results.push({
+            id: null,
+            olid: olId(doc.key),
+            title: doc.title,
+            subtitle: doc.subtitle ?? null,
+            authors: doc.author_name ?? [],
+            firstPublishedYear: doc.first_publish_year ?? null,
+            coverUrl: doc.cover_i ? bookCoverUrlById(doc.cover_i) : null,
+            source: 'openlibrary',
+        });
     }
+    return results;
 }

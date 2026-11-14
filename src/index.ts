@@ -1,8 +1,8 @@
-import { bookWorkHandler } from './api/books.ts';
+import { bookWorkHandler, bookEditionHandler } from './api/books.ts';
 import { searchHandler } from './api/search.ts';
 
 const env = process.env;
-import { testConnection as testMySqlConnection } from './db/bindings/mysql';
+import { testConnection as testPostgresConnection } from './db/bindings/postgres.ts';
 import { testConnection as testRedisConnection, redis } from './db/bindings/redis';
 
 async function flushRedis() {
@@ -17,7 +17,7 @@ async function flushRedis() {
 const server = Bun.serve({
     port: env.BACKEND_PORT,
     routes: {
-        "/api/test/mysql": async () => new Response(await testMySqlConnection()),
+        "/api/test/postgres": async () => Response.json([...await testPostgresConnection()]),
         "/api/test/redis": async () => new Response(await testRedisConnection()),
         "/api/debug/redis-flush": async () => await flushRedis(),
         "/api/search/:query": async req => {
@@ -32,6 +32,13 @@ const server = Bun.serve({
             try {
                 const result = await bookWorkHandler(`${req.params.query}`);
                 return result;
+            } catch (error: any) {
+                return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+            }
+        },
+        "/api/books/:query/editions": async req => {
+            try {
+                return await bookEditionHandler(`${req.params.query}`);
             } catch (error: any) {
                 return new Response(JSON.stringify({ error: error.message }), { status: 500 });
             }
