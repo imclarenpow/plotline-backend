@@ -1,8 +1,15 @@
 // Imports the OpenLibrary monthly dumps into the catalog (see docs/imports.md).
 //
-//   bun run import:openlibrary --download     # fetch the dumps if missing, then import
-//   bun run import:openlibrary --limit 200000 # sample: only the first 200k edition lines
-//   bun run import:openlibrary --dir D:/dumps # read dumps from another folder
+//   bun run import:openlibrary                  # import the newest dumps already in data/
+//   bun run import:openlibrary --download       # first download newer dumps, if published
+//   bun run import:openlibrary --limit 200000   # sample: only the first 200k edition lines
+//   bun run import:openlibrary --dir D:/dumps   # read dumps from another folder
+//   bun run import:openlibrary --force          # import a dump again that was already imported
+//   bun run import:openlibrary --keep-old-dumps # don't delete older dumps after a full import
+//
+// Dumps are stored by date (see dumps.ts). A dump that was already imported is skipped, so a
+// scheduled monthly `--download` run only does work when OpenLibrary has published a new one.
+// After a successful full import, older dumps are deleted to free disk space.
 //
 // Only editions with a valid ISBN in OPENLIBRARY_LANGUAGES are kept, plus their works and
 // authors. Five streaming passes, because each step needs IDs the previous one wrote:
@@ -11,16 +18,17 @@
 //   3. authors   write those authors
 //   4. works     link works to authors
 //   5. editions  write the editions picked in pass 1
-import { join } from 'node:path';
+import { basename } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
     IMPORT_BATCH_SIZE, IMPORT_DATA_DIR, IMPORT_PROGRESS_EVERY,
-    OPENLIBRARY_DUMPS, OPENLIBRARY_INCLUDE_NO_LANGUAGE, OPENLIBRARY_LANGUAGES,
+    OPENLIBRARY_INCLUDE_NO_LANGUAGE, OPENLIBRARY_LANGUAGES,
 } from '../../config/imports.ts';
 import { userAgent } from '../../config/openlibrary.ts';
 import { pg } from '../../db/bindings/postgres.ts';
 import * as repo from '../../db/imports/repo.ts';
-import { batched, downloadIfMissing, IdSet, readLines } from '../dump.ts';
+import { batched, IdSet, readLines } from '../dump.ts';
+import { deleteDumps, DUMP_NAMES, dumpDate, fetchLatestDump, findLocalDump, otherDumps, type DumpName } from './dumps.ts';
 import {
     mightBeWantedEdition, olNumber, parseAuthor, parseDumpLine, parseEdition, parseWork,
     type EditionFilter,
@@ -31,15 +39,18 @@ const { values: args } = parseArgs({
         dir: { type: 'string', default: IMPORT_DATA_DIR },
         download: { type: 'boolean', default: false },
         limit: { type: 'string' },
+        force: { type: 'boolean', default: false },
+        'keep-old-dumps': { type: 'boolean', default: false },
     },
 });
 const limit = args.limit ? Number(args.limit) : Infinity;
 if (Number.isNaN(limit) || limit <= 0) throw new Error(`--limit must be a positive number, got ${args.limit}`);
 
-type DumpName = keyof typeof OPENLIBRARY_DUMPS;
-const dumpPath = (name: DumpName) => join(args.dir!, OPENLIBRARY_DUMPS[name].file);
+const dir = args.dir!;
+// The dump file used for each kind; set by main() before any pass runs.
+const paths = {} as Record<DumpName, string>;
 const filter: EditionFilter = { languages: OPENLIBRARY_LANGUAGES, includeNoLanguage: OPENLIBRARY_INCLUDE_NO_LANGUAGE };
-const stats: Record<string, Record<string, number>> = {};
+const stats: Record<string, unknown> = {};
 
 // Parsed records of one type from a dump. `wanted` checks the key before the JSON is
 // copied out of the line, so skipped records cost almost nothing. Logs progress.
@@ -54,7 +65,7 @@ async function* records<T>(
     let lines = 0;
     let kept = 0;
     const started = Date.now();
-    for await (const line of readLines(dumpPath(dump))) {
+    for await (const line of readLines(paths[dump])) {
         if (++lines > maxLines) break;
         if (lines % IMPORT_PROGRESS_EVERY === 0) {
             console.log(`  ${step}: ${lines.toLocaleString()} lines, ${kept.toLocaleString()} kept (${Math.round((Date.now() - started) / 1000)}s)`);
@@ -91,10 +102,25 @@ async function writeBatches<T>(step: string, items: AsyncIterable<T>, write: (ba
 }
 
 async function main() {
-    for (const name of Object.keys(OPENLIBRARY_DUMPS) as DumpName[]) {
-        if (args.download) await downloadIfMissing(OPENLIBRARY_DUMPS[name].url, dumpPath(name), userAgent);
-        if (!(await Bun.file(dumpPath(name)).exists())) throw new Error(`Missing ${dumpPath(name)}. Run with --download, or pass --dir.`);
+    for (const name of DUMP_NAMES) {
+        if (args.download) await fetchLatestDump(dir, name, userAgent);
+        const path = findLocalDump(dir, name);
+        if (!path) throw new Error(`No ${name} dump in ${dir}. Run with --download, or pass --dir.`);
+        paths[name] = path;
     }
+    // All three come from the same monthly release; the editions dump's date stands for it.
+    const date = dumpDate(paths.editions);
+    const dates = new Set(DUMP_NAMES.map(name => dumpDate(paths[name])));
+    if (dates.size > 1) console.warn(`Warning: the dumps come from different releases: ${[...dates].join(', ')}`);
+    console.log(`Dumps: ${DUMP_NAMES.map(name => basename(paths[name])).join(', ')}`);
+
+    const sample = limit !== Infinity;
+    if (date && !sample && !args.force && (await repo.lastImportedDumpDate('openlibrary')) === date) {
+        console.log(`The ${date} dump is already imported. Nothing to do (use --force to import it again).`);
+        return;
+    }
+    // A sample doesn't count as importing the dump, so it records no date.
+    stats.dump = { date: sample ? null : date, files: DUMP_NAMES.map(name => basename(paths[name])) };
 
     const run = await repo.startImportRun('openlibrary');
     try {
@@ -133,6 +159,11 @@ async function main() {
     } catch (error) {
         await repo.finishImportRun(run, stats, error);
         throw error;
+    }
+
+    // Only a full import replaces the older dumps; a sample leaves them alone.
+    if (!sample && !args['keep-old-dumps']) {
+        deleteDumps(DUMP_NAMES.flatMap(name => otherDumps(dir, name, paths[name])));
     }
 }
 

@@ -229,6 +229,13 @@ export async function importEditions(source: SourceName, batch: ImportEdition[])
     return result;
 }
 
+// The dump date of the source's last successful import, so a scheduled run can skip a dump
+// it has already imported. Null if the last run didn't record one.
+export async function lastImportedDumpDate(source: SourceName): Promise<string | null> {
+    const [row] = await lookups.getLastImportedDumpDate(source);
+    return row?.date ?? null;
+}
+
 export async function startImportRun(source: SourceName): Promise<string> {
     const [row] = await mutations.insertImportRun(await sourceId(source));
     return row.id;

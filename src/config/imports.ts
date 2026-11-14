@@ -9,11 +9,12 @@ export const IMPORT_BATCH_SIZE = 1000;
 // Log progress every this many dump lines.
 export const IMPORT_PROGRESS_EVERY = 500_000;
 
-// OpenLibrary monthly dumps. The *_latest URLs redirect to the newest dump on archive.org.
+// OpenLibrary monthly dumps. The *_latest URLs redirect to the newest dated dump on
+// archive.org (e.g. ol_dump_works_2026-10-31.txt.gz), which is the name it's saved under.
 export const OPENLIBRARY_DUMPS = {
-    editions: { file: 'ol_dump_editions_latest.txt.gz', url: 'https://openlibrary.org/data/ol_dump_editions_latest.txt.gz' },
-    works: { file: 'ol_dump_works_latest.txt.gz', url: 'https://openlibrary.org/data/ol_dump_works_latest.txt.gz' },
-    authors: { file: 'ol_dump_authors_latest.txt.gz', url: 'https://openlibrary.org/data/ol_dump_authors_latest.txt.gz' },
+    editions: { url: 'https://openlibrary.org/data/ol_dump_editions_latest.txt.gz' },
+    works: { url: 'https://openlibrary.org/data/ol_dump_works_latest.txt.gz' },
+    authors: { url: 'https://openlibrary.org/data/ol_dump_authors_latest.txt.gz' },
 } as const;
 
 // Only editions with a valid ISBN in one of these languages (ISO 639-2, as OpenLibrary

@@ -125,6 +125,19 @@ describeDb("imports repo", () => {
         await pg`DELETE FROM import_runs WHERE id = ${run}`;
     });
 
+    test("lastImportedDumpDate returns the dump date of the last successful run", async () => {
+        const date = '2099-01-31'; // a date no real run will have
+        const run = await imports.startImportRun('openlibrary');
+        await imports.finishImportRun(run, { dump: { date } });
+        expect(await imports.lastImportedDumpDate('openlibrary')).toBe(date);
+
+        const failed = await imports.startImportRun('openlibrary');
+        await imports.finishImportRun(failed, { dump: { date: '2099-02-28' } }, new Error('boom'));
+        expect(await imports.lastImportedDumpDate('openlibrary')).toBe(date); // failed runs don't count
+
+        await pg`DELETE FROM import_runs WHERE id IN ${pg([run, failed])}`;
+    });
+
     test("an error with an empty message still marks the run failed", async () => {
         const run = await imports.startImportRun('openlibrary');
         await imports.finishImportRun(run, {}, new Error(''));

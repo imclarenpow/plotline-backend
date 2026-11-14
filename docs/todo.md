@@ -19,7 +19,9 @@ Things that are agreed but not built. Remove an item when it ships, and update t
 ## Imports (see [imports.md](imports.md))
 - GCD importer: dump into a separate `gcd` database, then match to catalog editions by ISBN/barcode
 - Wikidata importer: format, genre and awards for catalog works via P648, from a filtered dump or batched SPARQL
-- Run imports monthly, when new dumps are published
+- Run `import:openlibrary --download` monthly on the Docker host (cron, or n8n with a notification), downloading straight to the data drive instead of a dev PC
+- Let each source update the fields it set: record which source last set each work's and edition's fields, so a re-import can apply OpenLibrary's corrections without overwriting values from a higher-priority source or a person (do this before GCD lands)
+- Follow OpenLibrary redirects and deletions: merge works whose IDs became redirects into the surviving work (moving shelf items and reads), and handle deleted records
 - Import edition titles, physical format and series from the OpenLibrary dump
 
 ## Redis
