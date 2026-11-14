@@ -1,6 +1,6 @@
 # Imports
 
-Book data comes into the catalog from **bulk data dumps**, not live API calls. Search and book pages then read our own MySQL tables, and the live APIs are only a fallback.
+Book data comes into the catalog from **bulk data dumps**, not live API calls. Search and book pages then read our own Postgres tables, and the live APIs are only a fallback.
 
 This is required, not just faster: OpenLibrary's usage guidelines say its APIs "are not intended to serve as a bulk data backend or high-traffic commercial infrastructure" and point heavy users at the monthly dumps.
 
@@ -32,9 +32,9 @@ Each run is recorded in `import_runs` with its status, per-step counts (`stats`)
 - **Match by external ID.** Records are keyed by the source's own ID (`work_external_ids` etc.), so re-importing next month's dump updates rows instead of duplicating them.
 - **Fill, don't overwrite.** An import only fills fields that are still `NULL`. It never replaces a title or name, or a value that a higher-priority source or a person set.
 - **One ISBN, one edition.** An edition whose ISBN-13 already belongs to another edition is merged into it: the source ID is attached to the existing edition, and its empty fields are filled.
-- **Cross-reference IDs are first come, first served.** Goodreads, Wikidata and similar IDs use `INSERT IGNORE`, because sources contain duplicate records that share them.
+- **Cross-reference IDs are first come, first served.** Goodreads, Wikidata and similar IDs use `ON CONFLICT DO NOTHING`, because sources contain duplicate records that share them.
 - **Only XP fields go in `work_signals`.** For OpenLibrary that's the subject list.
-- When a run succeeds, `finishImportRun` recalculates `works.edition_count`, which search uses for ranking. Every importer gets this by finishing its run.
+- When a run succeeds, `finishImportRun` recalculates `works.edition_count`, which search uses for ranking, then runs `VACUUM (ANALYZE)` on the catalog tables. Bulk inserts leave new entries in the search indexes' pending lists, which every search scans until a vacuum merges them: on the 75k-work sample, searching "dune" took 28 ms before and 7 ms after. Every importer gets both by finishing its run.
 
 ## OpenLibrary
 

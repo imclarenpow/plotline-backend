@@ -1,6 +1,6 @@
 # Database
 
-MySQL 8, database `plotline_dev` (name comes from `MYSQL_DB_NAME`). The schema is **source-agnostic**: OpenLibrary, Wikidata, GCD, Google Books and user input all feed the same tables, and every fact records which source it came from.
+Postgres 18, database `plotline_dev` (name comes from `POSTGRES_DB_NAME`). The schema is **source-agnostic**: OpenLibrary, Wikidata, GCD, Google Books and user input all feed the same tables, and every fact records which source it came from.
 
 Schema files live in `db/creation/` and run in numbered order. The tables themselves are the source of truth for columns; this page explains the structure and the reasons behind it.
 
@@ -11,7 +11,7 @@ bun run db:reset              # drop + recreate, seed lookups and subjects, load
 bun run db:reset --no-dummy   # same, without dummy data
 ```
 
-`db/reset.ts` pipes the SQL into the `plotline-mysql` container as root, through the Docker context in [infrastructure.md](infrastructure.md). It refuses any database name that doesn't end in `_dev`. There are no migrations: the dev data is disposable, so schema changes go straight into `db/creation/` and the database is rebuilt.
+`db/reset.ts` pipes the SQL into the `plotline-postgres` container through `psql`, as the container's superuser, through the Docker context in [infrastructure.md](infrastructure.md). It refuses any database name that doesn't end in `_dev`. There are no migrations: the dev data is disposable, so schema changes go straight into `db/creation/` and the database is rebuilt.
 
 When adding a table, add it to the right numbered file (lookups before the tables that reference them) and to the file list in `db/reset.ts` if you create a new file.
 
@@ -107,11 +107,16 @@ erDiagram
 
 ## Conventions
 
-- **IDs:** entity tables use `BINARY(16)` UUIDs. The app generates them with `newUuid()` (v7, time-ordered) and converts with `uuidToBinary()` / `binaryToUuid()`. Lookup tables use `INT AUTO_INCREMENT`.
+- **IDs:** entity tables use native `uuid` columns holding UUIDv7 (time-ordered, so inserts stay at the end of the index). The app generates them with `newUuid()`, so a record's ID is known before it's inserted; `uuidv7()` is the SQL default. They're plain strings in TypeScript and readable in any SQL client. Lookup tables use `INT GENERATED ALWAYS AS IDENTITY`, and `import_runs`, an internal log, uses a `BIGINT` identity.
+- **Schema setup:** `00-extensions.sql` creates `pg_trgm` and `unaccent`, `search_normalize()` (lowercase, accents removed; used by every search column and query) and the `set_updated_at()` trigger that keeps `updated_at` current.
+- **Search columns:** `works.search_vector` and `contributors.search_vector` are generated `tsvector` columns with GIN indexes, built with the `simple` text config: no stemming and no stopwords, so "It" and "The" are searchable.
 - **Lookup tables, not ENUMs:** formats, roles, sources and subject categories are rows. To tune or add one, change the rows, not the schema.
 - **Lookups by name in SQL:** mutations resolve names with subqueries, e.g. `(SELECT id FROM sources WHERE name = ${source})`. An unknown source or role resolves to `NULL` and fails a `NOT NULL` constraint instead of being dropped silently. (`format_id` is nullable, so an unknown format name is stored as `NULL`.)
-- **Transactions:** mutations take an optional executor (`db: SQL = mysql`), so repos can run several inside `mysql.begin(async tx => ...)`.
-- **Dates:** read `DATE` columns with `toDateString()`. Bun returns them as local midnight, so `toISOString()` gives the wrong day in NZ.
+- **Transactions:** mutations take an optional executor (`db: SQL = pg`), so repos can run several inside `pg.begin(async tx => ...)`.
+- **Upserts:** `INSERT ... ON CONFLICT (key) DO UPDATE` with `EXCLUDED`, or `ON CONFLICT DO NOTHING`. One statement can't update the same row twice, so batches must not repeat a key.
+- **JSON:** `jsonb` columns take plain JS objects and come back parsed. Don't pass `JSON.stringify` output: it's stored as a JSON string.
+- **Dates:** select `DATE` columns as `::text` (Bun returns them as UTC timestamps otherwise) and read them with `toDateString()`.
+- **Counts:** `count(*)` and `bigint` come back as strings; wrap them in `Number()` or cast with `::int`. A write's affected-row count is `result.count`.
 
 ## Decisions
 
@@ -122,10 +127,10 @@ erDiagram
 | Comics are collected editions; single issues aren't tracked | Matches how people log comics. A `work_contents` table (a collection and the issues it contains) can be added later without changing other tables |
 | XP has a version, and history is locked | `works.xp_version` finds outdated scores; `user_reads.xp_awarded` protects earned totals |
 | GCD data will live in a separate `gcd` database | Monthly refreshes can't touch app data, and the CC BY-SA data stays isolated. Only extracted signals and IDs get copied in |
-| Redis is cache only | Anything that must persist is stored in MySQL |
+| Redis is cache only | Anything that must persist is stored in Postgres |
+| Postgres, not MySQL | Better search (full-text plus trigram typo tolerance), native `uuid` and `jsonb`, and it shares memory well on a host running other containers. Moved from MySQL 8 in November 2026 |
 
 ## Gotchas
 
-- **Bun ≥ 1.4 is required.** Bun 1.3.x's MySQL client doesn't roll back failed transactions and can hang the connection pool.
-- **`READS` is a reserved word** in MySQL, which is why the table is `user_reads`.
+- **Bun's SQL helpers** (`pg(array)`) only work in `INSERT`, `UPDATE` and `IN (...)`. Elsewhere, bind an array with a cast, e.g. `= ANY(${ids}::uuid[])`.
 - **`bun test` forces UTC,** so timezone bugs won't show up in tests.

@@ -18,7 +18,7 @@ import {
     OPENLIBRARY_DUMPS, OPENLIBRARY_INCLUDE_NO_LANGUAGE, OPENLIBRARY_LANGUAGES,
 } from '../../config/imports.ts';
 import { userAgent } from '../../config/openlibrary.ts';
-import { mysql } from '../../db/bindings/mysql.ts';
+import { pg } from '../../db/bindings/postgres.ts';
 import * as repo from '../../db/imports/repo.ts';
 import { batched, downloadIfMissing, IdSet, readLines } from '../dump.ts';
 import {
@@ -139,5 +139,5 @@ async function main() {
 try {
     await main();
 } finally {
-    await mysql.close();
+    await pg.close();
 }

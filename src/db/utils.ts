@@ -21,21 +21,9 @@ export function assertDateString(date: string): DateString {
     return date as DateString;
 }
 
-export function binaryToUuid(bin: Buffer | Uint8Array): UUID {
-    if (!(bin instanceof Uint8Array || Buffer.isBuffer(bin))) {
-        throw new Error("Expected binary UUID");
-    }
-
-    const hex = Array.from(bin)
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-
-    const uuid = `${hex.substr(0, 8)}-${hex.substr(8, 4)}-${hex.substr(12, 4)}-${hex.substr(16, 4)}-${hex.substr(20, 12)}`;
-    return uuid as UUID;
-}
-
-// MySQL DATE columns come back as JS Dates at local midnight; convert them to "YYYY-MM-DD".
-// Uses local date parts: toISOString() would shift the day in timezones ahead of UTC (e.g. NZ).
+// Normalises a DATE value to "YYYY-MM-DD". SQL modules select dates as ::text, which passes
+// straight through; a Date object is read with its local date parts, since toISOString()
+// would shift the day in timezones ahead of UTC (e.g. NZ).
 export function toDateString(value: Date | string | null | undefined): DateString | null {
     if (value == null) return null;
     if (typeof value === "string") return assertDateString(value.slice(0, 10));
@@ -49,21 +37,9 @@ export function toExternalIds(rows: Iterable<{ source: string; id: string }>): E
     return Array.from(rows, row => ({ source: row.source as SourceName, id: row.id }));
 }
 
-// Time-ordered (v7) UUIDs keep BINARY(16) primary keys roughly sequential, which suits InnoDB indexes.
+// Time-ordered (v7) UUIDs keep primary-key inserts at the end of the index. Generated in the app
+// so a record's ID is known before it is inserted (the importer relies on this).
 export function newUuid(): UUID {
     return Bun.randomUUIDv7() as UUID;
 }
 
-export function uuidToBinary(uuid: string | UUID): Buffer {
-    const hex = (uuid as string).replace(/-/g, "");
-    if (hex.length !== 32) throw new Error(`Invalid UUID string: ${uuid}`);
-    return Buffer.from(hex, "hex");
-}
-
-// Bun's IN-list helper (sql(array)) treats an array of Buffers as rows, not values, so
-// BINARY(16) ID lists can't use it. Pass this JSON instead and join through
-//   JSON_TABLE(${json}, '$[*]' COLUMNS (hex CHAR(32) PATH '$')) ids ... ON t.id = UNHEX(ids.hex)
-// which still uses the index on t.id.
-export function binaryIdsToJson(ids: Iterable<Uint8Array>): string {
-    return JSON.stringify(Array.from(ids, id => Buffer.from(id).toString("hex")));
-}

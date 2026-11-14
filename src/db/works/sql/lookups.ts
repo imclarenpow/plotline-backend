@@ -1,10 +1,10 @@
-import { mysql } from '../../bindings/mysql.ts';
+import { pg } from '../../bindings/postgres.ts';
 import type { SourceName } from '../../types.ts';
 
 // All work lookups return the same columns so repo.ts can map them with one function.
 
-export function getWorkById(workId: Buffer) {
-    return mysql`
+export function getWorkById(workId: string) {
+    return pg`
         SELECT w.id, w.title, w.subtitle, w.description, f.name AS format,
                w.first_published_year, w.page_count, w.xp, w.xp_version
         FROM works w
@@ -14,7 +14,7 @@ export function getWorkById(workId: Buffer) {
 }
 
 export function getWorkByExternalId(source: SourceName, externalId: string) {
-    return mysql`
+    return pg`
         SELECT w.id, w.title, w.subtitle, w.description, f.name AS format,
                w.first_published_year, w.page_count, w.xp, w.xp_version
         FROM works w
@@ -25,8 +25,8 @@ export function getWorkByExternalId(source: SourceName, externalId: string) {
     `;
 }
 
-export function getWorksByContributorId(contributorId: Buffer) {
-    return mysql`
+export function getWorksByContributorId(contributorId: string) {
+    return pg`
         SELECT w.id, w.title, w.subtitle, w.description, f.name AS format,
                w.first_published_year, w.page_count, w.xp, w.xp_version,
                r.name AS role
@@ -39,8 +39,8 @@ export function getWorksByContributorId(contributorId: Buffer) {
     `;
 }
 
-export function getWorkExternalIds(workId: Buffer) {
-    return mysql`
+export function getWorkExternalIds(workId: string) {
+    return pg`
         SELECT s.name AS source, x.external_id AS id
         FROM work_external_ids x
         JOIN sources s ON s.id = x.source_id
@@ -49,8 +49,8 @@ export function getWorkExternalIds(workId: Buffer) {
     `;
 }
 
-export function getEditionsByWorkId(workId: Buffer) {
-    return mysql`
+export function getEditionsByWorkId(workId: string) {
+    return pg`
         SELECT e.id, e.work_id, e.title, e.isbn13, e.isbn10, e.page_count,
                e.published_year, e.language, e.cover_url
         FROM editions e
@@ -59,8 +59,8 @@ export function getEditionsByWorkId(workId: Buffer) {
     `;
 }
 
-export function getEditionExternalIds(editionId: Buffer) {
-    return mysql`
+export function getEditionExternalIds(editionId: string) {
+    return pg`
         SELECT s.name AS source, x.external_id AS id
         FROM edition_external_ids x
         JOIN sources s ON s.id = x.source_id
@@ -70,8 +70,8 @@ export function getEditionExternalIds(editionId: Buffer) {
 }
 
 // Ordered by source priority so callers can take the first value they find per field.
-export function getWorkSignals(workId: Buffer) {
-    return mysql`
+export function getWorkSignals(workId: string) {
+    return pg`
         SELECT s.name AS source, ws.signals, ws.fetched_at
         FROM work_signals ws
         JOIN sources s ON s.id = ws.source_id

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { afterAllDb, describeDb } from '../testing.ts';
-import { mysql } from '../bindings/mysql.ts';
+import { pg } from '../bindings/postgres.ts';
 import { isbn10To13 } from '../../import/isbn.ts';
 import * as works from '../works/repo.ts';
 import * as contributors from '../contributors/repo.ts';
@@ -25,7 +25,7 @@ describeDb("imports repo", () => {
         if (work) await works.deleteWork(work.id);
         const author = await contributors.getContributorByExternalId('openlibrary', authorOlid);
         if (author) await contributors.deleteContributor(author.id);
-        await mysql`DELETE FROM publishers WHERE name = ${publisher}`;
+        await pg`DELETE FROM publishers WHERE name = ${publisher}`;
     });
 
     test("importWorks creates works with their external ID and signals", async () => {
@@ -112,18 +112,18 @@ describeDb("imports repo", () => {
     test("import runs record their outcome", async () => {
         const run = await imports.startImportRun('openlibrary');
         await imports.finishImportRun(run, { works: { created: 1 } }, new Error('boom'));
-        const [row] = await mysql`SELECT status, error, stats FROM import_runs WHERE id = ${run}`;
+        const [row] = await pg`SELECT status, error, stats FROM import_runs WHERE id = ${run}`;
         expect(row.status).toBe('failed');
         expect(row.error).toBe('boom');
-        await mysql`DELETE FROM import_runs WHERE id = ${run}`;
+        await pg`DELETE FROM import_runs WHERE id = ${run}`;
     });
 
     test("an error with an empty message still marks the run failed", async () => {
         const run = await imports.startImportRun('openlibrary');
         await imports.finishImportRun(run, {}, new Error(''));
-        const [row] = await mysql`SELECT status, error FROM import_runs WHERE id = ${run}`;
+        const [row] = await pg`SELECT status, error FROM import_runs WHERE id = ${run}`;
         expect(row.status).toBe('failed');
         expect(row.error).toBe('Unknown error');
-        await mysql`DELETE FROM import_runs WHERE id = ${run}`;
+        await pg`DELETE FROM import_runs WHERE id = ${run}`;
     });
 });

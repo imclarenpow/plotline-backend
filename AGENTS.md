@@ -1,6 +1,6 @@
 # Plotline Backend — Agent Instructions
 
-Bun + TypeScript backend for Plotline, a reading app that awards XP ("plotpoints") per book, with a comics-first focus. MySQL 8 stores data, Redis is a cache, and external sources (OpenLibrary now; GCD, Wikidata and Google Books planned) supply book data.
+Bun + TypeScript backend for Plotline, a reading app that awards XP ("plotpoints") per book, with a comics-first focus. Postgres 18 stores data, Redis is a cache, and external sources (OpenLibrary now; GCD, Wikidata and Google Books planned) supply book data.
 
 ## Read before you work on...
 
@@ -18,20 +18,20 @@ Bun + TypeScript backend for Plotline, a reading app that awards XP ("plotpoints
 
 ## Stack
 
-- **Runtime**: Bun **≥ 1.4** (not Node.js): `bun:test`, `Bun.serve()`, Bun's SQL and Redis clients. Bun 1.3.x's MySQL client doesn't roll back failed transactions and can hang the pool
+- **Runtime**: Bun **≥ 1.4** (not Node.js): `bun:test`, `Bun.serve()`, Bun's SQL and Redis clients
 - **Language**: TypeScript strict; `"module": "Preserve"`, so imports keep the `.ts` extension
 - **Validation**: Zod; derive types with `z.infer<>`
-- **DB**: MySQL via `` mysql`...` `` tagged templates; no ORM
+- **DB**: Postgres via `` pg`...` `` tagged templates (Bun's SQL client); no ORM
 - **Server**: `Bun.serve({ port, routes })` with plain route objects; no middleware
 
-Env vars (in `.env`, not committed): `DB_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_PORT`, `MYSQL_DB_NAME`, `REDIS_PASSWORD`, `REDIS_PORT`, `BACKEND_PORT`, `APP_NAME`, `APP_EMAIL_CONTACT`. Optional: `MYSQL_ALLOW_PUBLIC_KEY_RETRIEVAL=1` (dev only, see docs/infrastructure.md), `IMPORT_DATA_DIR`.
+Env vars (in `.env`, not committed): `DB_HOST`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`, `POSTGRES_DB_NAME`, `POSTGRES_DB_DIR`, `REDIS_PASSWORD`, `REDIS_PORT`, `BACKEND_PORT`, `APP_NAME`, `APP_EMAIL_CONTACT`. Optional: `IMPORT_DATA_DIR`.
 
 ## Commands
 
 ```bash
 bun run dev        # watch mode
 bun run test:git   # unit tests; DB tests are skipped
-bun run test:db    # DB tests (live MySQL + Redis): bindings + repo integration
+bun run test:db    # DB tests (live Postgres + Redis): bindings + repo integration
 bun run db:reset   # rebuild the dev database (only names ending in _dev)
 bun run import:openlibrary --download   # import OpenLibrary dumps into the catalog
 bunx tsc --noEmit  # typecheck
@@ -45,7 +45,7 @@ src/
   api/              ← handlers; return jsonResponse()
   schemas/          ← Zod schemas + inferred types (works, contributors, sources, ...)
   db/
-    bindings/       ← MySQL and Redis singletons
+    bindings/       ← Postgres (pg) and Redis singletons
     utils.ts        ← newUuid, uuidToBinary/binaryToUuid, toDateString, toExternalIds
     testing.ts      ← describeDb (DB tests only run under test:db)
     {domain}/       ← works, contributors, shelves, search, imports
@@ -73,7 +73,7 @@ docs/               ← see the table above
 ## Feature workflow
 
 1. **Schema**: Zod schema in `src/schemas/`, export `z.infer<>` types
-2. **SQL**: `src/db/{domain}/sql/lookups.ts` and `mutations.ts`. Mutations take `db: SQL = mysql` so they can run in transactions
+2. **SQL**: `src/db/{domain}/sql/lookups.ts` and `mutations.ts`. Mutations take `db: SQL = pg` so they can run in transactions
 3. **Repo**: `src/db/{domain}/repo.ts`
 4. **Handler**: `src/api/`; try/catch returning `{ error }` with a status
 5. **Route**: wire into `src/index.ts`
@@ -96,7 +96,7 @@ Redis read-through pattern (see `src/api/books.ts`): get cached → return if hi
 
 ## Testing
 
-- Wrap tests that need MySQL or Redis in `describeDb` from `src/db/testing.ts`. They skip unless `RUN_DB_TESTS=1`, which `test:db` sets. Use `afterAllDb` for cleanup that queries the database, so it never connects when the tests are skipped
+- Wrap tests that need Postgres or Redis in `describeDb` from `src/db/testing.ts`. They skip unless `RUN_DB_TESTS=1`, which `test:db` sets. Use `afterAllDb` for cleanup that queries the database, so it never connects when the tests are skipped
 - DB tests run against the dev database: use unique IDs and delete what you create in `afterAll`
 - `bun test` forces UTC, so timezone bugs won't show up in tests
 

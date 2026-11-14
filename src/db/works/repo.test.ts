@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from 'bun:test';
 import { describeDb } from '../testing.ts';
-import { mysql } from '../bindings/mysql.ts';
+import { pg } from '../bindings/postgres.ts';
 import * as works from './repo.ts';
 import * as contributors from '../contributors/repo.ts';
 import { SourceNameSchema } from '../../schemas/sources.ts';
@@ -19,7 +19,7 @@ afterAll(async () => {
 
 describeDb("seeded lookup tables", () => {
     test("formats, sources, roles and subjects are populated", async () => {
-        const [counts] = await mysql`
+        const [counts] = await pg`
             SELECT (SELECT COUNT(*) FROM formats) AS formats,
                    (SELECT COUNT(*) FROM sources) AS sources,
                    (SELECT COUNT(*) FROM contributor_roles) AS roles,
@@ -32,7 +32,7 @@ describeDb("seeded lookup tables", () => {
     });
 
     test("SourceNameSchema matches the rows in the sources table", async () => {
-        const rows = await mysql`SELECT name FROM sources ORDER BY name`;
+        const rows = await pg`SELECT name FROM sources ORDER BY name`;
         const inDb = rows.map((r: { name: string }) => r.name);
         expect([...SourceNameSchema.options].sort()).toEqual(inDb);
     });
@@ -87,7 +87,7 @@ describeDb("works repo", () => {
             externalIds: [{ source: 'openlibrary', id: workOlid }],
         })).rejects.toThrow();
         // the transaction rolled back, so no orphan 'Duplicate' work was left behind
-        const [row] = await mysql`SELECT COUNT(*) AS n FROM works WHERE title = 'Duplicate'`;
+        const [row] = await pg`SELECT COUNT(*) AS n FROM works WHERE title = 'Duplicate'`;
         expect(Number(row.n)).toBe(0);
     });
 
@@ -158,7 +158,7 @@ describeDb("contributors repo", () => {
         });
         await works.deleteWork(work.id);
         expect(await works.getWorkByExternalId('openlibrary', `OL${suffix}9W`)).toBeNull();
-        const [row] = await mysql`SELECT COUNT(*) AS n FROM work_external_ids WHERE external_id = ${`OL${suffix}9W`}`;
+        const [row] = await pg`SELECT COUNT(*) AS n FROM work_external_ids WHERE external_id = ${`OL${suffix}9W`}`;
         expect(Number(row.n)).toBe(0);
     });
 });

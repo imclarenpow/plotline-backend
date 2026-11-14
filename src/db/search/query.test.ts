@@ -1,27 +1,28 @@
 import { describe, expect, test } from 'bun:test';
-import { toBooleanQuery } from './query.ts';
+import { toTsQuery } from './query.ts';
 
-describe("toBooleanQuery", () => {
+describe("toTsQuery", () => {
     test("requires every word, as a prefix", async () => {
-        expect(toBooleanQuery('Harry Pott')).toBe('+harry* +pott*');
+        expect(toTsQuery('Harry Pott')).toBe('harry:* & pott:*');
     });
 
-    test("drops stopwords and words shorter than the index's minimum", async () => {
-        expect(toBooleanQuery('The Lord of the Rings')).toBe('+lord* +rings*');
-        expect(toBooleanQuery('Saga Vol 1')).toBe('+saga* +vol*');
+    test("keeps short words and stopwords, which the 'simple' config indexes", async () => {
+        expect(toTsQuery('It')).toBe('it:*');
+        expect(toTsQuery('The Lord of the Rings')).toBe('the:* & lord:* & of:* & rings:*');
+        expect(toTsQuery('Saga Vol 1')).toBe('saga:* & vol:* & 1:*');
     });
 
-    test("strips boolean-mode operators so input can't change the query", async () => {
-        expect(toBooleanQuery('-dune +"messiah" (children)~')).toBe('+dune* +messiah* +children*');
+    test("strips tsquery operators so input can't change the query", async () => {
+        expect(toTsQuery("dune & !messiah | (children):* <-> 'x'")).toBe('dune:* & messiah:* & children:* & x:*');
     });
 
     test("keeps accented letters and other scripts", async () => {
-        expect(toBooleanQuery('Astérix')).toBe('+astérix*');
-        expect(toBooleanQuery('ワンピース')).toBe('+ワンピース*');
+        expect(toTsQuery('Astérix')).toBe('astérix:*');
+        expect(toTsQuery('ワンピース')).toBe('ワンピース:*');
     });
 
-    test("returns null when no word is usable", async () => {
-        expect(toBooleanQuery('It')).toBeNull();
-        expect(toBooleanQuery('  ')).toBeNull();
+    test("returns null when there are no words", async () => {
+        expect(toTsQuery('  ')).toBeNull();
+        expect(toTsQuery('?!')).toBeNull();
     });
 });

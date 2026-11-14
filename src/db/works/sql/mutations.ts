@@ -1,5 +1,5 @@
 import type { SQL } from 'bun';
-import { mysql } from '../../bindings/mysql.ts';
+import { pg } from '../../bindings/postgres.ts';
 import type { SourceName } from '../../types.ts';
 import type { NewEdition, NewWork } from '../types.ts';
 
@@ -8,7 +8,7 @@ import type { NewEdition, NewWork } from '../types.ts';
 // resolves to NULL and fails the NOT NULL constraint instead of being silently dropped.
 
 type WorkFields = Pick<NewWork, 'title' | 'subtitle' | 'description' | 'format' | 'firstPublishedYear' | 'pageCount'>;
-export function insertWork(id: Buffer, d: WorkFields, db: SQL = mysql) {
+export function insertWork(id: string, d: WorkFields, db: SQL = pg) {
     return db`
         INSERT INTO works (id, title, subtitle, description, format_id, first_published_year, page_count)
         VALUES (
@@ -19,7 +19,7 @@ export function insertWork(id: Buffer, d: WorkFields, db: SQL = mysql) {
     `;
 }
 
-export function insertWorkExternalId(workId: Buffer, source: SourceName, externalId: string, db: SQL = mysql) {
+export function insertWorkExternalId(workId: string, source: SourceName, externalId: string, db: SQL = pg) {
     return db`
         INSERT INTO work_external_ids (source_id, external_id, work_id)
         VALUES ((SELECT id FROM sources WHERE name = ${source}), ${externalId}, ${workId});
@@ -27,7 +27,7 @@ export function insertWorkExternalId(workId: Buffer, source: SourceName, externa
 }
 
 type EditionFields = Pick<NewEdition, 'title' | 'isbn13' | 'isbn10' | 'pageCount' | 'publishedYear' | 'language' | 'coverUrl'>;
-export function insertEdition(id: Buffer, workId: Buffer, d: EditionFields, db: SQL = mysql) {
+export function insertEdition(id: string, workId: string, d: EditionFields, db: SQL = pg) {
     return db`
         INSERT INTO editions (id, work_id, title, isbn13, isbn10, page_count, published_year, language, cover_url)
         VALUES (
@@ -37,14 +37,14 @@ export function insertEdition(id: Buffer, workId: Buffer, d: EditionFields, db: 
     `;
 }
 
-export function insertEditionExternalId(editionId: Buffer, source: SourceName, externalId: string, db: SQL = mysql) {
+export function insertEditionExternalId(editionId: string, source: SourceName, externalId: string, db: SQL = pg) {
     return db`
         INSERT INTO edition_external_ids (source_id, external_id, edition_id)
         VALUES ((SELECT id FROM sources WHERE name = ${source}), ${externalId}, ${editionId});
     `;
 }
 
-export function insertWorkContributor(workId: Buffer, contributorId: Buffer, role: string, position: number, db: SQL = mysql) {
+export function insertWorkContributor(workId: string, contributorId: string, role: string, position: number, db: SQL = pg) {
     return db`
         INSERT INTO work_contributors (work_id, contributor_id, role_id, position)
         VALUES (${workId}, ${contributorId}, (SELECT id FROM contributor_roles WHERE name = ${role}), ${position});
@@ -52,22 +52,23 @@ export function insertWorkContributor(workId: Buffer, contributorId: Buffer, rol
 }
 
 // One row per (work, source); a re-fetch replaces the previous signals.
-export function upsertWorkSignals(workId: Buffer, source: SourceName, signals: Record<string, unknown>, db: SQL = mysql) {
+// signals is passed as an object: Bun encodes it for the jsonb column.
+export function upsertWorkSignals(workId: string, source: SourceName, signals: Record<string, unknown>, db: SQL = pg) {
     return db`
         INSERT INTO work_signals (work_id, source_id, signals)
-        VALUES (${workId}, (SELECT id FROM sources WHERE name = ${source}), ${JSON.stringify(signals)}) AS new
-        ON DUPLICATE KEY UPDATE signals = new.signals, fetched_at = CURRENT_TIMESTAMP;
+        VALUES (${workId}, (SELECT id FROM sources WHERE name = ${source}), ${signals})
+        ON CONFLICT (work_id, source_id) DO UPDATE SET signals = EXCLUDED.signals, fetched_at = now();
     `;
 }
 
-export function updateWorkXp(workId: Buffer, xp: number, xpVersion: number, db: SQL = mysql) {
+export function updateWorkXp(workId: string, xp: number, xpVersion: number, db: SQL = pg) {
     return db`
         UPDATE works
-        SET xp = ${xp}, xp_version = ${xpVersion}, xp_updated_at = CURRENT_TIMESTAMP
+        SET xp = ${xp}, xp_version = ${xpVersion}, xp_updated_at = now()
         WHERE id = ${workId};
     `;
 }
 
-export function deleteWorkById(workId: Buffer, db: SQL = mysql) {
+export function deleteWorkById(workId: string, db: SQL = pg) {
     return db`DELETE FROM works WHERE id = ${workId};`;
 }

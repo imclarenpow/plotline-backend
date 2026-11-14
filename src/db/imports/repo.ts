@@ -2,8 +2,8 @@
 // from a source, matches them to existing rows by that source's external IDs, and writes the
 // batch in one transaction. Re-importing the same records updates rather than duplicates.
 import type { SQL } from 'bun';
-import { mysql } from '../bindings/mysql.ts';
-import { newUuid, uuidToBinary } from '../utils.ts';
+import { pg } from '../bindings/postgres.ts';
+import { newUuid } from '../utils.ts';
 import { uniqueBy } from '../../utils/general.ts';
 import type { ExternalId, SourceName } from '../types.ts';
 import type { ImportContributor, ImportEdition, ImportWork, ImportWorkContributors } from './types.ts';
@@ -18,7 +18,7 @@ const NOTHING: BatchResult = { created: 0, updated: 0, skipped: 0 };
 // almost every batch, so caching them saves two queries per edition batch.
 const sourceIds = new Map<string, number>();
 const roleIds = new Map<string, number>();
-const publisherIds = new Map<string, Buffer>();
+const publisherIds = new Map<string, string>();
 
 async function loadSourceIds(): Promise<void> {
     if (!sourceIds.size) {
@@ -42,23 +42,19 @@ async function roleId(name: string): Promise<number> {
     return roleIds.get(name)!;
 }
 
-const newId = () => uuidToBinary(newUuid());
-
-function idMap(rows: Iterable<Row>, keyColumn: string, idColumn: string): Map<string, Buffer> {
-    const map = new Map<string, Buffer>();
-    for (const row of rows) map.set(row[keyColumn], Buffer.from(row[idColumn]));
-    return map;
+function idMap(rows: Iterable<Row>, keyColumn: string, idColumn: string): Map<string, string> {
+    return new Map(Array.from(rows, row => [row[keyColumn], row[idColumn]]));
 }
 
 // Gives each record its existing row ID, or a new one plus the external ID row that links it.
 function assignIds<K extends string>(
-    externalIds: string[], existing: Map<string, Buffer>, src: number, column: K,
-): { ids: Buffer[]; newIds: mutations.ExternalIdRow<K>[] } {
+    externalIds: string[], existing: Map<string, string>, src: number, column: K,
+): { ids: string[]; newIds: mutations.ExternalIdRow<K>[] } {
     const newIds: mutations.ExternalIdRow<K>[] = [];
     const ids = externalIds.map(externalId => {
         const found = existing.get(externalId);
         if (found) return found;
-        const id = newId();
+        const id = newUuid();
         newIds.push({ source_id: src, external_id: externalId, [column]: id } as mutations.ExternalIdRow<K>);
         return id;
     });
@@ -66,7 +62,7 @@ function assignIds<K extends string>(
 }
 
 // Cross-reference IDs (goodreads, wikidata, ...) for each written row. Sources must be loaded.
-function otherIdRows<K extends string>(column: K, owners: { id: Buffer; otherIds: ExternalId[] }[]) {
+function otherIdRows<K extends string>(column: K, owners: { id: string; otherIds: ExternalId[] }[]) {
     return owners.flatMap(({ id, otherIds }) => otherIds.map(x => {
         const source_id = sourceIds.get(x.source);
         if (source_id == null) throw new Error(`Unknown source: ${x.source}`);
@@ -79,7 +75,7 @@ export async function importWorks(source: SourceName, batch: ImportWork[]): Prom
     if (!works.length) return NOTHING;
     const src = await sourceId(source);
 
-    return mysql.begin(async tx => {
+    return pg.begin(async tx => {
         const externalIds = works.map(w => w.externalId);
         const existing = idMap(await lookups.getWorkIdsByExternalIds(src, externalIds, tx), 'external_id', 'work_id');
         const { ids, newIds } = assignIds(externalIds, existing, src, 'work_id');
@@ -90,7 +86,7 @@ export async function importWorks(source: SourceName, batch: ImportWork[]): Prom
         if (newIds.length) await mutations.insertWorkExternalIds(newIds, tx);
 
         const signals = works.flatMap((w, i) => w.signals
-            ? [{ work_id: ids[i]!, source_id: src, signals: JSON.stringify(w.signals) }]
+            ? [{ work_id: ids[i]!, source_id: src, signals: w.signals }]
             : []);
         if (signals.length) await mutations.upsertWorkSignals(signals, tx);
 
@@ -103,7 +99,7 @@ export async function importContributors(source: SourceName, batch: ImportContri
     if (!people.length) return NOTHING;
     const src = await sourceId(source);
 
-    return mysql.begin(async tx => {
+    return pg.begin(async tx => {
         const externalIds = people.map(c => c.externalId);
         const existing = idMap(await lookups.getContributorIdsByExternalIds(src, externalIds, tx), 'external_id', 'contributor_id');
         const { ids, newIds } = assignIds(externalIds, existing, src, 'contributor_id');
@@ -114,7 +110,7 @@ export async function importContributors(source: SourceName, batch: ImportContri
         if (newIds.length) await mutations.insertContributorExternalIds(newIds, tx);
 
         const others = otherIdRows('contributor_id', people.map((c, i) => ({ id: ids[i]!, otherIds: c.otherIds })));
-        if (others.length) await mutations.insertIgnoreContributorExternalIds(others, tx);
+        if (others.length) await mutations.insertContributorExternalIdsIfNew(others, tx);
 
         return { created: newIds.length, updated: people.length - newIds.length, skipped: 0 };
     });
@@ -148,31 +144,34 @@ export async function importWorkContributors(source: SourceName, batch: ImportWo
         });
     }
     // Links that already exist are ignored, so count only the rows actually inserted.
-    const inserted = rows.length ? Number((await mutations.insertIgnoreWorkContributors(rows)).affectedRows ?? 0) : 0;
+    const inserted = rows.length ? (await mutations.insertWorkContributorsIfNew(rows)).count : 0;
     return { created: inserted, updated: 0, skipped };
 }
 
-// Accent- and case-insensitive key, matching the utf8mb4_0900_ai_ci collation closely enough
-// to map publisher names back to their rows.
-function nameKey(name: string): string {
-    return name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+// Publisher IDs by exact name, creating publishers not seen before. IDs found or created in
+// this transaction go into `fresh`; the caller adds them to the cache only once it commits.
+async function publisherIdsFor(names: string[], fresh: Map<string, string>, tx: SQL) {
+    const missing = [...new Set(names)].filter(name => !publisherIds.has(name));
+    if (missing.length) {
+        await mutations.insertPublishersIfNew(missing.map(name => ({ id: newUuid(), name })), tx);
+        for (const row of await lookups.getPublisherIdsByName(missing, tx)) fresh.set(row.name, row.id);
+    }
+    return (name: string | null) => (name ? publisherIds.get(name) ?? fresh.get(name) ?? null : null);
 }
 
-// Publisher IDs by name, creating publishers not seen before. IDs found or created in this
-// transaction go into `fresh`; the caller adds them to the cache only once it commits.
-async function publisherIdsFor(names: string[], fresh: Map<string, Buffer>, tx: SQL) {
-    const missing = [...new Set(names)].filter(name => !publisherIds.has(nameKey(name)));
-    if (missing.length) {
-        await mutations.insertIgnorePublishers(missing.map(name => ({ id: newId(), name })), tx);
-        for (const row of await lookups.getPublisherIdsByName(missing, tx)) {
-            fresh.set(nameKey(row.name), Buffer.from(row.id));
+// Editions merged by ISBN can share an ID within a batch. Postgres won't upsert one row twice
+// in a statement, so combine them: the first row wins, later rows only fill its empty fields.
+function mergeById(rows: mutations.EditionRow[]): mutations.EditionRow[] {
+    const merged = new Map<string, mutations.EditionRow>();
+    for (const row of rows) {
+        const first = merged.get(row.id);
+        if (!first) merged.set(row.id, { ...row });
+        else {
+            const target = first as Record<string, unknown>;
+            for (const [key, value] of Object.entries(row)) target[key] ??= value;
         }
     }
-    return (name: string | null) => {
-        if (!name) return null;
-        const key = nameKey(name);
-        return publisherIds.get(key) ?? fresh.get(key) ?? null;
-    };
+    return [...merged.values()];
 }
 
 // Editions whose work isn't in the catalog are skipped. An edition whose ISBN-13 already
@@ -182,16 +181,16 @@ export async function importEditions(source: SourceName, batch: ImportEdition[])
     const editions = uniqueBy(batch, e => e.externalId);
     if (!editions.length) return NOTHING;
     const src = await sourceId(source);
-    const freshPublishers = new Map<string, Buffer>();
+    const freshPublishers = new Map<string, string>();
 
-    const result = await mysql.begin(async tx => {
+    const result = await pg.begin(async tx => {
         const works = idMap(await lookups.getWorkIdsByExternalIds(src, [...new Set(editions.map(e => e.workExternalId))], tx), 'external_id', 'work_id');
         const kept = editions.filter(e => works.has(e.workExternalId));
         if (!kept.length) return { ...NOTHING, skipped: editions.length };
 
         const existing = idMap(await lookups.getEditionIdsByExternalIds(src, kept.map(e => e.externalId), tx), 'external_id', 'edition_id');
         const isbns = [...new Set(kept.filter(e => !existing.has(e.externalId) && e.isbn13).map(e => e.isbn13!))];
-        const byIsbn = isbns.length ? idMap(await lookups.getEditionIdsByIsbn13(isbns, tx), 'isbn13', 'id') : new Map<string, Buffer>();
+        const byIsbn = isbns.length ? idMap(await lookups.getEditionIdsByIsbn13(isbns, tx), 'isbn13', 'id') : new Map<string, string>();
         const publisherId = await publisherIdsFor(kept.flatMap(e => (e.publisher ? [e.publisher] : [])), freshPublishers, tx);
 
         const rows: mutations.EditionRow[] = [];
@@ -201,7 +200,7 @@ export async function importEditions(source: SourceName, batch: ImportEdition[])
             let id = existing.get(e.externalId) ?? (e.isbn13 ? byIsbn.get(e.isbn13) : undefined);
             const isNew = !id;
             if (!id) {
-                id = newId();
+                id = newUuid();
                 created++;
                 if (e.isbn13) byIsbn.set(e.isbn13, id);
             }
@@ -218,11 +217,11 @@ export async function importEditions(source: SourceName, batch: ImportEdition[])
                 cover_url: e.coverUrl,
             });
         }
-        await mutations.upsertEditions(rows, tx);
+        await mutations.upsertEditions(mergeById(rows), tx);
         if (newIds.length) await mutations.insertEditionExternalIds(newIds, tx);
 
         const others = otherIdRows('edition_id', kept.map((e, i) => ({ id: rows[i]!.id, otherIds: e.otherIds })));
-        if (others.length) await mutations.insertIgnoreEditionExternalIds(others, tx);
+        if (others.length) await mutations.insertEditionExternalIdsIfNew(others, tx);
 
         return { created, updated: kept.length - created, skipped: editions.length - kept.length };
     });
@@ -230,17 +229,17 @@ export async function importEditions(source: SourceName, batch: ImportEdition[])
     return result;
 }
 
-export async function startImportRun(source: SourceName): Promise<Buffer> {
-    const id = newId();
-    await mutations.insertImportRun(id, await sourceId(source));
-    return id;
+export async function startImportRun(source: SourceName): Promise<string> {
+    const [row] = await mutations.insertImportRun(await sourceId(source));
+    return row.id;
 }
 
-// On success, also recalculates works.edition_count (search ranking), so no importer can
-// forget to.
-export async function finishImportRun(id: Buffer, stats: Record<string, unknown>, error?: unknown): Promise<void> {
+// On success, also recalculates works.edition_count (search ranking) and vacuums the catalog
+// so search stays fast, so no importer can forget to.
+export async function finishImportRun(id: string, stats: Record<string, unknown>, error?: unknown): Promise<void> {
     if (error == null) {
         await mutations.refreshEditionCounts();
+        await mutations.vacuumCatalog();
         await mutations.finishImportRun(id, 'succeeded', stats, null);
     } else {
         const message = (error instanceof Error ? error.message : String(error)) || 'Unknown error';

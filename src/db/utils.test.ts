@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { assertDateString, binaryToUuid, newUuid, toDateString, toExternalIds, uuidToBinary } from './utils.ts';
+import { assertDateString, newUuid, toDateString, toExternalIds } from './utils.ts';
 
 describe("assertDateString", () => {
     test("accepts valid dates, including 29 February", async () => {
@@ -19,29 +19,17 @@ describe("assertDateString", () => {
     });
 });
 
-describe("UUID conversion", () => {
-    test("round-trips through BINARY(16)", async () => {
-        const id = newUuid();
-        const bin = uuidToBinary(id);
-        expect(bin.length).toBe(16);
-        expect<string>(binaryToUuid(bin)).toBe(id);
-    });
-
-    test("newUuid produces time-ordered v7 UUIDs", async () => {
+describe("newUuid", () => {
+    test("produces time-ordered v7 UUIDs", async () => {
         const a = newUuid();
         const b = newUuid();
         expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
         expect(a < b).toBe(true);
     });
-
-    test("rejects malformed input", async () => {
-        expect(() => uuidToBinary("1234")).toThrow(/Invalid UUID/);
-        expect(() => binaryToUuid("not binary" as any)).toThrow(/Expected binary UUID/);
-    });
 });
 
 describe("toDateString", () => {
-    test("formats a local-midnight Date (how MySQL DATE columns arrive) as YYYY-MM-DD", async () => {
+    test("formats a Date by its local date parts as YYYY-MM-DD", async () => {
         expect<string | null>(toDateString(new Date(1976, 6, 17))).toBe("1976-07-17");
     });
 

@@ -1,16 +1,16 @@
 # Infrastructure
 
-MySQL and Redis run as Docker containers on a separate Docker host on the LAN (`DB_HOST` in `.env`). Compose file: `db/docker/docker-compose.yml`. All configuration comes from `.env` at the repo root, which is not committed.
+Postgres and Redis run as Docker containers on a separate Docker host on the LAN (`DB_HOST` in `.env`). Compose file: `db/docker/docker-compose.yml`. All configuration comes from `.env` at the repo root, which is not committed.
 
 ## Containers
 
 | Container | Host port | Notes |
 |---|---|---|
-| `plotline-mysql` | `MYSQL_PORT` (3306) | MySQL 8. The database and app user are only created on first start with an empty data folder |
-| `plotline-postgres` | `POSTGRES_PORT` (5433) → 5432 in the container | Postgres 18, replacing MySQL. Not on 5432 because another stack already uses it. Memory is tuned for a 16 GB host shared with other containers: a 1 GB cache of its own (`shared_buffers`), with the rest left to the OS page cache |
+| `plotline-mysql` | `MYSQL_PORT` (3306) | MySQL 8. **No longer used by the app**; kept until the move to Postgres is confirmed, then removed |
+| `plotline-postgres` | `POSTGRES_PORT` (5433) → 5432 in the container | Postgres 18. The database and user are only created on first start with an empty data folder. Not on 5432 because another stack already uses it. Memory is tuned for a 16 GB host shared with other containers: a 1 GB cache of its own (`shared_buffers`), with the rest left to the OS page cache |
 | `plotline-redis` | `REDIS_PORT` (6380) → 6379 in the container | Not on 6379 because another stack on the host already publishes that port. Capped at 256 MB, evicting the least-used keys, since it's only a cache |
 
-Data is bind-mounted from `MYSQL_DB_DIR` and `REDIS_DB_DIR` on the host, so recreating the containers keeps the data. **Check the data drive is mounted before recreating them:** otherwise MySQL starts against an empty folder and creates a fresh database.
+Data is bind-mounted from `POSTGRES_DB_DIR` and `REDIS_DB_DIR` on the host, so recreating the containers keeps the data. **Check the data drive is mounted before recreating them:** otherwise Postgres starts against an empty folder and creates a fresh database.
 
 ## Managing the containers from a dev machine
 
@@ -30,11 +30,11 @@ docker --context plotline-host compose --env-file .env -f db/docker/docker-compo
 ## Checking connectivity
 
 ```bash
-bun run test:db                         # MySQL + Redis connection tests and repo integration tests
+bun run test:db                         # Postgres + Redis connection tests and repo integration tests
 ```
 
-Or, with the server running, `GET /api/test/mysql` and `GET /api/test/redis`.
+Or, with the server running, `GET /api/test/postgres` and `GET /api/test/redis`.
 
-If MySQL refuses the login with *"The server requested RSA public key retrieval… not allowed over an insecure connection"*, MySQL has restarted. MySQL 8.4 logs users in with `caching_sha2_password`: after a restart, each account's first login must use TLS or fetch the server's RSA public key, and Bun does neither by default. Later plain logins work until the next restart. On a dev machine on the LAN, set `MYSQL_ALLOW_PUBLIC_KEY_RETRIEVAL=1` in `.env`. **Never set it in production**: someone who can intercept the connection could capture the password during that first login. Production should use TLS instead. To fix it without the setting, log in once from inside the container (a socket login counts as secure): `docker --context plotline-host exec -it plotline-mysql mysql -u<MYSQL_USER> -p`.
+To browse the data, connect a SQL client such as DBeaver (PostgreSQL driver) to `DB_HOST`, port `POSTGRES_PORT`, database `POSTGRES_DB_NAME`, with `POSTGRES_USER` and `POSTGRES_PASSWORD`.
 
-If both fail at once, check that the ports are reachable (`Test-NetConnection <host> -Port 3306` on Windows), then check the containers on the host (`docker ps -a --filter name=plotline`).
+If both fail at once, check that the ports are reachable (`Test-NetConnection <host> -Port 5433` on Windows), then check the containers on the host (`docker ps -a --filter name=plotline`).

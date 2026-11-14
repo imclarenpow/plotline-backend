@@ -1,5 +1,5 @@
-import { mysql } from '../bindings/mysql.ts';
-import { binaryToUuid, newUuid, toExternalIds, uuidToBinary } from '../utils.ts';
+import { pg } from '../bindings/postgres.ts';
+import { newUuid, toExternalIds } from '../utils.ts';
 import type { SourceName } from '../types.ts';
 import * as lookups from './sql/lookups.ts';
 import * as mutations from './sql/mutations.ts';
@@ -9,7 +9,7 @@ type Row = Record<string, any>;
 
 function rowToWork(row: Row): Work {
     return {
-        id: binaryToUuid(row.id),
+        id: row.id,
         title: row.title,
         subtitle: row.subtitle,
         description: row.description,
@@ -23,8 +23,8 @@ function rowToWork(row: Row): Work {
 
 function rowToEdition(row: Row): Edition {
     return {
-        id: binaryToUuid(row.id),
-        workId: binaryToUuid(row.work_id),
+        id: row.id,
+        workId: row.work_id,
         title: row.title,
         isbn13: row.isbn13,
         isbn10: row.isbn10,
@@ -36,12 +36,12 @@ function rowToEdition(row: Row): Edition {
 }
 
 async function withExternalIds(work: Work): Promise<Work> {
-    const ids = await lookups.getWorkExternalIds(uuidToBinary(work.id));
+    const ids = await lookups.getWorkExternalIds(work.id);
     return { ...work, externalIds: toExternalIds(ids) };
 }
 
 export async function getWork(workId: string): Promise<Work | null> {
-    const [row] = await lookups.getWorkById(uuidToBinary(workId));
+    const [row] = await lookups.getWorkById(workId);
     return row ? withExternalIds(rowToWork(row)) : null;
 }
 
@@ -51,29 +51,28 @@ export async function getWorkByExternalId(source: SourceName, externalId: string
 }
 
 export async function getWorksByContributor(contributorId: string): Promise<ContributedWork[]> {
-    const rows = await lookups.getWorksByContributorId(uuidToBinary(contributorId));
+    const rows = await lookups.getWorksByContributorId(contributorId);
     return rows.map((row: Row) => ({ ...rowToWork(row), role: row.role }));
 }
 
 // Creates the work and its external IDs atomically.
 export async function createWork(newWork: NewWork): Promise<Work> {
     const id = newUuid();
-    const bin = uuidToBinary(id);
-    await mysql.begin(async tx => {
-        await mutations.insertWork(bin, newWork, tx);
+    await pg.begin(async tx => {
+        await mutations.insertWork(id, newWork, tx);
         for (const x of newWork.externalIds ?? []) {
-            await mutations.insertWorkExternalId(bin, x.source, x.id, tx);
+            await mutations.insertWorkExternalId(id, x.source, x.id, tx);
         }
     });
     return (await getWork(id))!;
 }
 
 export async function deleteWork(workId: string): Promise<void> {
-    await mutations.deleteWorkById(uuidToBinary(workId));
+    await mutations.deleteWorkById(workId);
 }
 
 export async function getEditions(workId: string): Promise<Edition[]> {
-    const rows = await lookups.getEditionsByWorkId(uuidToBinary(workId));
+    const rows = await lookups.getEditionsByWorkId(workId);
     return Promise.all(rows.map(async (row: Row) => ({
         ...rowToEdition(row),
         externalIds: toExternalIds(await lookups.getEditionExternalIds(row.id)),
@@ -82,34 +81,33 @@ export async function getEditions(workId: string): Promise<Edition[]> {
 
 export async function addEdition(workId: string, newEdition: NewEdition): Promise<Edition> {
     const id = newUuid();
-    const bin = uuidToBinary(id);
-    await mysql.begin(async tx => {
-        await mutations.insertEdition(bin, uuidToBinary(workId), newEdition, tx);
+    await pg.begin(async tx => {
+        await mutations.insertEdition(id, workId, newEdition, tx);
         for (const x of newEdition.externalIds ?? []) {
-            await mutations.insertEditionExternalId(bin, x.source, x.id, tx);
+            await mutations.insertEditionExternalId(id, x.source, x.id, tx);
         }
     });
     return { ...newEdition, id, workId, externalIds: newEdition.externalIds ?? [] };
 }
 
 export async function linkContributor(workId: string, contributorId: string, role: string, position = 0): Promise<void> {
-    await mutations.insertWorkContributor(uuidToBinary(workId), uuidToBinary(contributorId), role, position);
+    await mutations.insertWorkContributor(workId, contributorId, role, position);
 }
 
 export async function setWorkSignals(workId: string, source: SourceName, signals: Record<string, unknown>): Promise<void> {
-    await mutations.upsertWorkSignals(uuidToBinary(workId), source, signals);
+    await mutations.upsertWorkSignals(workId, source, signals);
 }
 
 // Highest-priority source first.
 export async function getWorkSignals(workId: string): Promise<WorkSignals[]> {
-    const rows = await lookups.getWorkSignals(uuidToBinary(workId));
+    const rows = await lookups.getWorkSignals(workId);
     return rows.map((row: Row) => ({
         source: row.source,
-        signals: typeof row.signals === 'string' ? JSON.parse(row.signals) : row.signals,
+        signals: row.signals, // jsonb arrives parsed
         fetchedAt: row.fetched_at,
     }));
 }
 
 export async function setWorkXp(workId: string, xp: number, xpVersion: number): Promise<void> {
-    await mutations.updateWorkXp(uuidToBinary(workId), xp, xpVersion);
+    await mutations.updateWorkXp(workId, xp, xpVersion);
 }

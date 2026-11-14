@@ -6,10 +6,10 @@ Every error returns `{ "error": "<message>" }` with status `500`. Responses are 
 
 ## Search
 
-`/api/search/:query` searches **our own catalog** (MySQL full-text, filled by [imports](imports.md)) and caches the response in Redis for 24h under `search:v2:{query}`. The `v2` changes whenever the cached shape does, so old entries are never served.
+`/api/search/:query` searches **our own catalog** (Postgres full-text, filled by [imports](imports.md)) and caches the response in Redis for 24h under `search:v2:{query}`. The `v2` changes whenever the cached shape does, so old entries are never served.
 
 - Title matches come first: an exact title, then full-text relevance, then works with more editions. Every word is required and matched as a prefix (`harry pott` finds *Harry Potter*). If too few titles match, works whose contributor names match are added.
-- Words InnoDB doesn't index (shorter than 3 letters, or a stopword such as "the") are dropped from the query. A query with no indexable words (e.g. "It") matches exact titles only.
+- Accents and case are ignored (`asterix` finds *Astérix*), and short words and stopwords are searchable (`It`, `The Stand`).
 - **Fallback:** when the catalog returns fewer than `minCatalogResults` (5), OpenLibrary's `search.json` fills the rest, limited to the fields in `SEARCH_PARAMS`. Results the catalog already returned are dropped.
 - **When a source fails:** if the catalog query fails, OpenLibrary answers alone; if OpenLibrary fails but the catalog found something, the catalog results are returned. Either way the partial answer isn't cached. Only when both fail does the route return `500`.
 - `authors` lists every contributor once, in display order, whatever their roles.
@@ -39,7 +39,7 @@ These read from OpenLibrary through a Redis read-through cache (24h TTL). They d
 
 | Route | Does |
 |---|---|
-| `/api/test/mysql` | Runs `SELECT 1 AS ok` |
+| `/api/test/postgres` | Runs `SELECT 1 AS ok` |
 | `/api/test/redis` | Sends `PING`; returns `PONG` |
 | `/api/debug/redis-flush` | **`FLUSHALL`: clears all of Redis**, not just Plotline keys. Development only |
 

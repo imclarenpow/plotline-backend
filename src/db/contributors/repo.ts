@@ -1,5 +1,5 @@
-import { mysql } from '../bindings/mysql.ts';
-import { binaryToUuid, newUuid, toDateString, toExternalIds, uuidToBinary } from '../utils.ts';
+import { pg } from '../bindings/postgres.ts';
+import { newUuid, toDateString, toExternalIds } from '../utils.ts';
 import type { SourceName } from '../types.ts';
 import * as lookups from './sql/lookups.ts';
 import * as mutations from './sql/mutations.ts';
@@ -9,7 +9,7 @@ type Row = Record<string, any>;
 
 function rowToContributor(row: Row): Contributor {
     return {
-        id: binaryToUuid(row.id),
+        id: row.id,
         name: row.name,
         bio: row.bio,
         birthDate: toDateString(row.birth_date),
@@ -18,12 +18,12 @@ function rowToContributor(row: Row): Contributor {
 }
 
 async function withExternalIds(contributor: Contributor): Promise<Contributor> {
-    const ids = await lookups.getContributorExternalIds(uuidToBinary(contributor.id));
+    const ids = await lookups.getContributorExternalIds(contributor.id);
     return { ...contributor, externalIds: toExternalIds(ids) };
 }
 
 export async function getContributor(contributorId: string): Promise<Contributor | null> {
-    const [row] = await lookups.getContributorById(uuidToBinary(contributorId));
+    const [row] = await lookups.getContributorById(contributorId);
     return row ? withExternalIds(rowToContributor(row)) : null;
 }
 
@@ -35,16 +35,15 @@ export async function getContributorByExternalId(source: SourceName, externalId:
 // Creates the contributor and their external IDs atomically.
 export async function createContributor(newContributor: NewContributor): Promise<Contributor> {
     const id = newUuid();
-    const bin = uuidToBinary(id);
-    await mysql.begin(async tx => {
-        await mutations.insertContributor(bin, newContributor, tx);
+    await pg.begin(async tx => {
+        await mutations.insertContributor(id, newContributor, tx);
         for (const x of newContributor.externalIds ?? []) {
-            await mutations.insertContributorExternalId(bin, x.source, x.id, tx);
+            await mutations.insertContributorExternalId(id, x.source, x.id, tx);
         }
     });
     return (await getContributor(id))!;
 }
 
 export async function deleteContributor(contributorId: string): Promise<void> {
-    await mutations.deleteContributorById(uuidToBinary(contributorId));
+    await mutations.deleteContributorById(contributorId);
 }
