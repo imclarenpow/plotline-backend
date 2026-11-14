@@ -8,7 +8,7 @@ Each provider is a row in the `sources` table (`db/creation/inserts/01-lookups.s
 
 | Source | Status | Licence / terms | Commercial | Used for |
 |---|---|---|---|---|
-| **OpenLibrary** | In use | Open data; terms not yet verified for commercial use | Unverified | Search, works, editions, subjects. The search front end and the fallback for everything else |
+| **OpenLibrary** | In use | Open data; terms not yet verified for commercial use. API guidelines: not for bulk or high-traffic commercial use; use the monthly dumps | Unverified | Works, editions, authors and subjects, imported from the monthly dumps ([imports.md](imports.md)). The live API is only a fallback for search and book pages |
 | **Grand Comics Database (GCD)** | Planned | CC BY-SA 4.0: attribution required; shared derivatives must use the same licence | Yes | Western comics: page counts, story types, genre, reprint links. Loaded from data dumps into a separate `gcd` database |
 | **Wikidata** | Planned | CC0 | Yes | Format (P31 "instance of", P7937 "form of creative work"), genre, awards. Links straight from OpenLibrary IDs via P648 |
 | **Google Books** | Planned | Google APIs Terms of Service | Yes, with their attribution and caching rules | Page counts and BISAC categories by ISBN (e.g. "Comics & Graphic Novels / Manga") |
@@ -29,4 +29,5 @@ Each provider is a row in the `sources` table (`db/creation/inserts/01-lookups.s
 
 - **Store only what XP needs** in `work_signals`, not whole API responses. This also keeps within caching rules such as Google's.
 - **Show attribution** wherever a source's data appears. The text is in `sources.attribution`.
+- **Bulk data comes from dumps, never by crawling an API.** OpenLibrary asks for this explicitly, and may rate-limit or block clients that ignore it.
 - **The User-Agent sent to OpenLibrary** is built from `APP_NAME` + `APP_EMAIL_CONTACT`.

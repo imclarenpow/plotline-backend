@@ -9,6 +9,7 @@ Bun + TypeScript backend for Plotline, a reading app that awards XP ("plotpoints
 | Schema, SQL, repos, `db:reset` | [docs/database.md](docs/database.md) |
 | XP / plotpoints | [docs/xp.md](docs/xp.md) |
 | Adding or using an external data source | [docs/data-sources.md](docs/data-sources.md) (licensing rules) |
+| Importing dumps into the catalog | [docs/imports.md](docs/imports.md) |
 | Routes and caching behaviour | [docs/api.md](docs/api.md) |
 | Docker host, containers, connectivity | [docs/infrastructure.md](docs/infrastructure.md) |
 | What's planned next | [docs/todo.md](docs/todo.md) |
@@ -23,7 +24,7 @@ Bun + TypeScript backend for Plotline, a reading app that awards XP ("plotpoints
 - **DB**: MySQL via `` mysql`...` `` tagged templates; no ORM
 - **Server**: `Bun.serve({ port, routes })` with plain route objects; no middleware
 
-Env vars (in `.env`, not committed): `DB_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_PORT`, `MYSQL_DB_NAME`, `REDIS_PASSWORD`, `REDIS_PORT`, `BACKEND_PORT`, `APP_NAME`, `APP_EMAIL_CONTACT`.
+Env vars (in `.env`, not committed): `DB_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_PORT`, `MYSQL_DB_NAME`, `REDIS_PASSWORD`, `REDIS_PORT`, `BACKEND_PORT`, `APP_NAME`, `APP_EMAIL_CONTACT`. Optional: `MYSQL_ALLOW_PUBLIC_KEY_RETRIEVAL=1` (dev only, see docs/infrastructure.md), `IMPORT_DATA_DIR`.
 
 ## Commands
 
@@ -32,6 +33,7 @@ bun run dev        # watch mode
 bun run test:git   # unit tests; DB tests are skipped
 bun run test:db    # DB tests (live MySQL + Redis): bindings + repo integration
 bun run db:reset   # rebuild the dev database (only names ending in _dev)
+bun run import:openlibrary --download   # import OpenLibrary dumps into the catalog
 bunx tsc --noEmit  # typecheck
 ```
 
@@ -46,12 +48,13 @@ src/
     bindings/       ← MySQL and Redis singletons
     utils.ts        ← newUuid, uuidToBinary/binaryToUuid, toDateString, toExternalIds
     testing.ts      ← describeDb (DB tests only run under test:db)
-    {domain}/       ← works, contributors, shelves, search
+    {domain}/       ← works, contributors, shelves, search, imports
       types.ts      ← re-exports from schemas
       repo.ts       ← composes SQL modules; maps rows to typed objects
       sql/lookups.ts, sql/mutations.ts   ← SELECTs / writes only
       redis/        ← cache lookups and mutations
   services/         ← external API clients (openlibrary/)
+  import/           ← dump importers: dump.ts, isbn.ts, {source}/parse.ts + run.ts
   config/           ← constants per service
 db/
   creation/         ← schema (numbered, run in order) + inserts/ seeds
@@ -93,7 +96,7 @@ Redis read-through pattern (see `src/api/books.ts`): get cached → return if hi
 
 ## Testing
 
-- Wrap tests that need MySQL or Redis in `describeDb` from `src/db/testing.ts`. They skip unless `RUN_DB_TESTS=1`, which `test:db` sets
+- Wrap tests that need MySQL or Redis in `describeDb` from `src/db/testing.ts`. They skip unless `RUN_DB_TESTS=1`, which `test:db` sets. Use `afterAllDb` for cleanup that queries the database, so it never connects when the tests are skipped
 - DB tests run against the dev database: use unique IDs and delete what you create in `afterAll`
 - `bun test` forces UTC, so timezone bugs won't show up in tests
 
@@ -107,3 +110,4 @@ Redis read-through pattern (see `src/api/books.ts`): get cached → return if hi
 - No ORM, HTTP framework, middleware stack or router library
 - No linter, formatter or build pipeline unless explicitly requested
 - No data source that can't be used commercially (see docs/data-sources.md)
+- No bulk data from live APIs: use the source's dumps (see docs/imports.md)

@@ -66,3 +66,18 @@ CREATE TABLE IF NOT EXISTS work_subjects (
     FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
     FOREIGN KEY (source_id) REFERENCES sources(id)
 );
+
+-- One row per bulk import (e.g. a monthly OpenLibrary dump). See docs/imports.md.
+CREATE TABLE IF NOT EXISTS import_runs (
+    id BINARY(16) DEFAULT (UUID_TO_BIN(UUID(), 1)),
+    source_id INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'running',
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP NULL,
+    stats JSON NULL, -- counts per step
+    error TEXT NULL,
+    PRIMARY KEY (id),
+    INDEX idx_import_runs_source (source_id, started_at),
+    CONSTRAINT chk_import_runs_status CHECK (status IN ('running', 'succeeded', 'failed')),
+    FOREIGN KEY (source_id) REFERENCES sources(id)
+);

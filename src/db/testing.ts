@@ -1,5 +1,11 @@
-import { describe } from 'bun:test';
+import { afterAll, describe } from 'bun:test';
 
 // DB tests need live MySQL/Redis, so they only run under `bun run test:db` (RUN_DB_TESTS=1).
 // Anywhere else they are skipped rather than failing the suite.
-export const describeDb = process.env.RUN_DB_TESTS === '1' ? describe : describe.skip;
+const runDbTests = process.env.RUN_DB_TESTS === '1';
+export const describeDb = runDbTests ? describe : describe.skip;
+
+// Cleanup for DB tests: a no-op when they're skipped, so cleanup never connects under test:git.
+export function afterAllDb(fn: () => Promise<unknown>): void {
+    if (runDbTests) afterAll(fn);
+}

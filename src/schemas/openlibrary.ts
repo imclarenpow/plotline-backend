@@ -4,13 +4,18 @@ export const WorkOlidSchema = z.string().regex(/^OL\d+W$/);
 export const AuthorOlidSchema = z.string().regex(/^OL\d+A$/);
 export const WorkOlidResponseSchema = z.string().regex(/^(\/works\/)?OL\d+W$/);
 
-// TODO: Add in expected payload fields that will be used.
+// One doc from search.json, limited to the fields requested in SEARCH_PARAMS that we use.
+export const SearchDocSchema = z.object({
+    key: WorkOlidResponseSchema,
+    title: z.string(),
+    subtitle: z.string().optional(),
+    author_name: z.array(z.string()).optional(),
+    first_publish_year: z.number().int().optional(),
+    cover_i: z.number().int().optional(),
+});
+
 export const SearchPayloadSchema = z.object({
-    docs: z.array(z.object({
-        key: WorkOlidResponseSchema,
-        title: z.string(),
-        
-    }))
+    docs: z.array(SearchDocSchema)
 })
 
 export const CoverSizeSchema = z.enum(['S', 'M', 'L']);

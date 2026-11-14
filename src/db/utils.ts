@@ -59,3 +59,11 @@ export function uuidToBinary(uuid: string | UUID): Buffer {
     if (hex.length !== 32) throw new Error(`Invalid UUID string: ${uuid}`);
     return Buffer.from(hex, "hex");
 }
+
+// Bun's IN-list helper (sql(array)) treats an array of Buffers as rows, not values, so
+// BINARY(16) ID lists can't use it. Pass this JSON instead and join through
+//   JSON_TABLE(${json}, '$[*]' COLUMNS (hex CHAR(32) PATH '$')) ids ... ON t.id = UNHEX(ids.hex)
+// which still uses the index on t.id.
+export function binaryIdsToJson(ids: Iterable<Uint8Array>): string {
+    return JSON.stringify(Array.from(ids, id => Buffer.from(id).toString("hex")));
+}

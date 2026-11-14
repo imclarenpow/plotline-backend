@@ -4,17 +4,36 @@ All routes are `GET` and wired in `src/index.ts`. Base URL in development: `http
 
 Every error returns `{ "error": "<message>" }` with status `500`. Responses are JSON, sent with `jsonResponse()`.
 
+## Search
+
+`/api/search/:query` searches **our own catalog** (MySQL full-text, filled by [imports](imports.md)) and caches the response in Redis for 24h under `search:v2:{query}`. The `v2` changes whenever the cached shape does, so old entries are never served.
+
+- Title matches come first: an exact title, then full-text relevance, then works with more editions. Every word is required and matched as a prefix (`harry pott` finds *Harry Potter*). If too few titles match, works whose contributor names match are added.
+- Words InnoDB doesn't index (shorter than 3 letters, or a stopword such as "the") are dropped from the query. A query with no indexable words (e.g. "It") matches exact titles only.
+- **Fallback:** when the catalog returns fewer than `minCatalogResults` (5), OpenLibrary's `search.json` fills the rest, limited to the fields in `SEARCH_PARAMS`. Results the catalog already returned are dropped.
+- **When a source fails:** if the catalog query fails, OpenLibrary answers alone; if OpenLibrary fails but the catalog found something, the catalog results are returned. Either way the partial answer isn't cached. Only when both fail does the route return `500`.
+- `authors` lists every contributor once, in display order, whatever their roles.
+
+Response (`SearchResponse` in `src/schemas/search.ts`), up to 20 results (`config/search.ts`):
+
+```json
+{ "query": "dune", "results": [
+  { "id": "0190…", "olid": "OL893415W", "title": "Dune", "subtitle": null,
+    "authors": ["Frank Herbert"], "firstPublishedYear": 1965,
+    "coverUrl": "https://covers.openlibrary.org/b/id/11481354-M.jpg", "source": "catalog" }
+] }
+```
+
+`id` is our work ID and is `null` for results only OpenLibrary has. `olid` opens the book with `/api/books/:olid`.
+
 ## Books (OpenLibrary)
 
-These read from OpenLibrary through a Redis read-through cache (24h TTL). They don't touch MySQL yet.
+These read from OpenLibrary through a Redis read-through cache (24h TTL). They don't read the catalog yet.
 
 | Route | Returns | Redis key |
 |---|---|---|
-| `/api/search/:query` | OpenLibrary search results, limited to 20 (`config/search.ts`) and the fields in `SEARCH_PARAMS` (`config/openlibrary.ts`) | `search:{query}` |
 | `/api/books/:query` | One OpenLibrary work. `:query` must be a work ID (`OL{digits}W`) | `work:{id}` |
 | `/api/books/:query/editions` | Up to 100 editions of a work | `edition:{id}` |
-
-After a search, each result is also cached under `work:{id}`, in a reduced "DB format" (`transformBookOLDataToDBFormat`).
 
 ## Infrastructure
 
@@ -26,6 +45,5 @@ After a search, each result is also cached under `work:{id}`, in a reduced "DB f
 
 ## Known issues
 
-- **Search overwrites the work cache.** Because search results are cached under `work:{id}` in the reduced format, `/api/books/:id` returns that reduced shape instead of the full work for 24h after the work appears in a search.
 - **Duplicate fetches.** Concurrent identical requests can each miss the cache and call OpenLibrary. A fetch lock is planned (see [todo.md](todo.md)).
 - **No 503 response.** If OpenLibrary is unreachable, routes return `500` like any other error.

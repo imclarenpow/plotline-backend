@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from 'bun:test';
 import { describeDb } from '../../testing.ts';
 import { redis } from '../../bindings/redis.ts';
-import { ttl } from '../../../config/redis.ts';
+import { searchPrefix, ttl } from '../../../config/redis.ts';
 import { getEditionsSearchInfo, getSearchQuery, getWorksSearchInfo } from './lookups.ts';
 import { setEditionsSearchInfo, setSearchQuery, setWorksSearchInfo } from './mutations.ts';
 
@@ -40,14 +40,14 @@ describeDb("search cache", () => {
         expect(await redis.exists(key)).toBe(false);
     });
 
-    test("setSearchQuery caches the query and each result's work", async () => {
+    test("setSearchQuery caches only the query, never the works in it", async () => {
         const query = `plotline-test-${suffix}`;
         const work = `OL${suffix}5W`;
-        track(`search:${query}`);
+        track(`${searchPrefix}:${query}`);
         track(`work:${work}`);
-        await setSearchQuery(query, { docs: [{ key: `/works/${work}`, title: 'From search' }] });
+        await setSearchQuery(query, { query, results: [{ olid: work, title: 'From search' }] });
 
-        expect((await getSearchQuery(query))?.docs).toHaveLength(1);
-        expect((await getWorksSearchInfo(work))?.title).toBe('From search');
+        expect((await getSearchQuery(query))?.results).toHaveLength(1);
+        expect(await getWorksSearchInfo(work)).toBeNull();
     });
 });

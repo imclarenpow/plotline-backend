@@ -8,7 +8,8 @@
     "dev": "bun --watch run ./src/index.ts",
     "test:git": "bun test src",
     "test:db": "RUN_DB_TESTS=1 bun test src/db",
-    "db:reset": "bun run db/reset.ts"
+    "db:reset": "bun run db/reset.ts",
+    "import:openlibrary": "bun run src/import/openlibrary/run.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

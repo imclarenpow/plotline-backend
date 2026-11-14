@@ -18,7 +18,7 @@ When adding a table, add it to the right numbered file (lookups before the table
 ## Areas
 
 ### Catalog: what a book is
-- **works**: the story, or for comics and manga, one **collected edition** (trade, volume or omnibus). Holds the canonical `page_count` and the final `xp`. Both are nullable: unknown is `NULL`, never `0`.
+- **works**: the story, or for comics and manga, one **collected edition** (trade, volume or omnibus). Holds the canonical `page_count` and the final `xp`. Both are nullable: unknown is `NULL`, never `0`. `edition_count` ranks search results and is recalculated after each import. `title`/`subtitle` and `contributors.name` have `FULLTEXT` indexes for search.
 - **editions**: a specific printing: ISBNs, publisher, per-printing page count, cover. External sources match on ISBNs, so they link here.
 - **formats** (lookup): `prose`, `comic`, `manga`, `picture_book`, each with an XP `density` multiplier.
 - **publishers**: `implied_format_id` gives a cheap format guess (Viz → manga).
@@ -30,6 +30,7 @@ When adding a table, add it to the right numbered file (lookups before the table
 - **work_external_ids / edition_external_ids / contributor_external_ids**: the key is `(source_id, external_id)`, so one ID can never attach to two records.
 - **work_signals**: the fields each source provided for a work (not raw API responses), stored as JSON. XP can be recalculated from this table without calling any API.
 - **subjects** + **subject_categories** + **work_subjects**: subject difficulty values for XP. See [xp.md](xp.md).
+- **import_runs**: one row per bulk import, with its status and counts. See [imports.md](imports.md).
 
 ### Users and reading
 - **users**, **shelves**, **shelf_items** (optionally pointing at an edition).

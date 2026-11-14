@@ -34,4 +34,6 @@ bun run test:db                         # MySQL + Redis connection tests and rep
 
 Or, with the server running, `GET /api/test/mysql` and `GET /api/test/redis`.
 
+If MySQL refuses the login with *"The server requested RSA public key retrieval… not allowed over an insecure connection"*, MySQL has restarted. MySQL 8.4 logs users in with `caching_sha2_password`: after a restart, each account's first login must use TLS or fetch the server's RSA public key, and Bun does neither by default. Later plain logins work until the next restart. On a dev machine on the LAN, set `MYSQL_ALLOW_PUBLIC_KEY_RETRIEVAL=1` in `.env`. **Never set it in production**: someone who can intercept the connection could capture the password during that first login. Production should use TLS instead. To fix it without the setting, log in once from inside the container (a socket login counts as secure): `docker --context plotline-host exec -it plotline-mysql mysql -u<MYSQL_USER> -p`.
+
 If both fail at once, check that the ports are reachable (`Test-NetConnection <host> -Port 3306` on Windows), then check the containers on the host (`docker ps -a --filter name=plotline`).

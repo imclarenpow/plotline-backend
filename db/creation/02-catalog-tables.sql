@@ -13,10 +13,13 @@ CREATE TABLE IF NOT EXISTS works (
     xp INT UNSIGNED NULL, -- NULL until computed
     xp_version SMALLINT UNSIGNED NULL, -- formula version xp was computed with
     xp_updated_at TIMESTAMP NULL,
+    edition_count INT UNSIGNED NOT NULL DEFAULT 0, -- search ranking; refreshed by imports
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     INDEX idx_works_xp_version (xp_version),
+    INDEX idx_works_title (title), -- exact-title search, for queries full-text ignores ("It")
+    FULLTEXT INDEX ft_works_title (title, subtitle),
     FOREIGN KEY (format_id) REFERENCES formats(id) ON DELETE SET NULL
 );
 
@@ -57,7 +60,8 @@ CREATE TABLE IF NOT EXISTS contributors (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    INDEX idx_contributors_name (name)
+    INDEX idx_contributors_name (name),
+    FULLTEXT INDEX ft_contributors_name (name)
 );
 
 -- work <-N--N-> contributors, one row per role (a person can write and draw).

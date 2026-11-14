@@ -1,22 +1,17 @@
 import { redis } from "../../bindings/redis.ts";
 import { searchPrefix, searchWorksPrefix, searchEditionsPrefix, ttl } from "../../../config/redis.ts";
-import * as ol from '../../../services/openlibrary/utils.ts';
 
 async function setCachedSearchPayload<T>(
     prefix: string,
     keyPart: string,
     payload: T,
     errorContext: string,
-    afterSet?: (payload: T) => Promise<void>,
 ) {
     const key = `${prefix}:${keyPart}`;
     const value = JSON.stringify(payload);
     try {
         await redis.set(key, value);
         await redis.expire(key, ttl);
-        if (afterSet) {
-            await afterSet(payload);
-        }
     } catch (error) {
         console.error(`[REDIS] Error ${errorContext} for key ${key}`, error);
         throw error;
@@ -24,7 +19,7 @@ async function setCachedSearchPayload<T>(
 }
 
 export async function setSearchQuery(query: string, payload: any) {
-    await setCachedSearchPayload(searchPrefix, query, payload, "caching search query", ol.processSearchResults);
+    await setCachedSearchPayload(searchPrefix, query, payload, "caching search query");
 }
 
 export async function setWorksSearchInfo(work: string, payload: any) {
