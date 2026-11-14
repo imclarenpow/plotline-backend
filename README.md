@@ -24,7 +24,7 @@ REDIS_PASSWORD=redispassword
 REDIS_PORT=6380
 
 # Storage on the Docker host
-ROOT_DIR=/mnt/mediadrive/plotline
+ROOT_DIR=/your/dir/here
 DB_DIR=${ROOT_DIR}/db/data
 POSTGRES_DB_DIR=${DB_DIR}/postgres
 REDIS_DB_DIR=${DB_DIR}/redis
