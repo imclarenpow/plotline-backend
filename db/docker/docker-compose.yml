@@ -1,23 +1,9 @@
 # Docker Compose file for DBs
 name: plotline-databases
 services:
-  mysql:
-    image: mysql:8
-    container_name: plotline-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?missing}
-      MYSQL_DATABASE: ${MYSQL_DB_NAME:?missing}
-      MYSQL_USER: ${MYSQL_USER:?missing}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?missing}
-    ports:
-      - "3306:3306"
-    volumes:
-      - ${MYSQL_DB_DIR}:/var/lib/mysql
-
-  # Replacing MySQL (see docs/infrastructure.md). Memory is tuned for a 16 GB host shared
-  # with other containers: Postgres keeps a small cache of its own and leans on the OS page
-  # cache, which the kernel hands back to other containers under memory pressure.
+  # Memory is tuned for a 16 GB host shared with other containers: Postgres keeps a small
+  # cache of its own and leans on the OS page cache, which the kernel hands back to other
+  # containers under memory pressure.
   postgres:
     image: postgres:18-alpine
     container_name: plotline-postgres

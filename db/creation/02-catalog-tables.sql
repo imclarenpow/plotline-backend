@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS works (
 );
 CREATE INDEX IF NOT EXISTS idx_works_xp_version ON works (xp_version);
 CREATE INDEX IF NOT EXISTS idx_works_search ON works USING GIN (search_vector);
+-- Exact-title lookups, and typo-tolerant title matching (pg_trgm word similarity).
+CREATE INDEX IF NOT EXISTS idx_works_title_normalized ON works (search_normalize(title));
+CREATE INDEX IF NOT EXISTS idx_works_title_trgm ON works USING GIN (search_normalize(title) gin_trgm_ops);
 CREATE OR REPLACE TRIGGER works_updated_at BEFORE UPDATE ON works FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE IF NOT EXISTS publishers (
@@ -65,6 +68,7 @@ CREATE TABLE IF NOT EXISTS contributors (
 );
 CREATE INDEX IF NOT EXISTS idx_contributors_name ON contributors (name);
 CREATE INDEX IF NOT EXISTS idx_contributors_search ON contributors USING GIN (search_vector);
+CREATE INDEX IF NOT EXISTS idx_contributors_name_trgm ON contributors USING GIN (search_normalize(name) gin_trgm_ops);
 CREATE OR REPLACE TRIGGER contributors_updated_at BEFORE UPDATE ON contributors FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- work <-N--N-> contributors, one row per role (a person can write and draw).

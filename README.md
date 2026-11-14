@@ -1,121 +1,72 @@
 # Plotline Backend
 
-To install dependencies:
+Bun + TypeScript backend for Plotline: Postgres 18 for data, Redis as a cache, and book data imported from OpenLibrary's dumps. Contributor docs start at [AGENTS.md](AGENTS.md).
 
 ```bash
-bun install
+bun install      # dependencies
+bun start        # run the server
+bun run dev      # run with watch mode
 ```
 
-To run:
+## Environment
 
-```bash
-bun start
-```
-
-This project was created using `bun init` in bun v1.3.6. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
-
-# Setup Details
-Below is details on setting up the requirements for the backend.
----
-
-## Environment Setup
-
-Create a `.env` file in the root directory with:
+Create a `.env` file in the root directory:
 
 ```env
-# Database
-MYSQL_DB_NAME=plotline_prd
-MYSQL_ROOT_PASSWORD=rootpasswordhere
-MYSQL_USER=yourusername
-MYSQL_PASSWORD=yourpassword
+# Postgres
+POSTGRES_DB_NAME=plotline_dev
+POSTGRES_USER=yourusername
+POSTGRES_PASSWORD=yourpassword
+POSTGRES_PORT=5433
 
 # Redis
 REDIS_PASSWORD=redispassword
-REDIS_PORT=6379
+REDIS_PORT=6380
 
-# Storage
+# Storage on the Docker host
 ROOT_DIR=/mnt/mediadrive/plotline
 DB_DIR=${ROOT_DIR}/db/data
-MYSQL_DB_DIR=${DB_DIR}/mysql
+POSTGRES_DB_DIR=${DB_DIR}/postgres
 REDIS_DB_DIR=${DB_DIR}/redis
 
 # Server
 DB_HOST=192.168.1.123
 BACKEND_PORT=3001
 
-# User Agent & Other Settings
+# User agent sent to OpenLibrary
 APP_NAME=Plotline/Testing
 APP_EMAIL_CONTACT=example@mail.com
 ```
-Note: you can set DB_HOST to localhost if you are running the db on the same machine.
----
 
-## Docker & Database Setup
+Set `DB_HOST` to `localhost` if the databases run on the same machine.
 
-### Starting the Containers
+## Databases
 
-```bash
-docker-compose -f db/docker/docker-compose.yml --env-file .env up -d
-```
-
-### Verify Configuration
+Start the containers (see [docs/infrastructure.md](docs/infrastructure.md) for running them on another Docker host):
 
 ```bash
-docker-compose -f db/docker/docker-compose.yml --env-file .env config
+docker compose --env-file .env -f db/docker/docker-compose.yml up -d
 ```
 
-### Creating the Database
-
-Connect to MySQL:
+Postgres creates the database and user on first start. Then build the schema and load seed data:
 
 ```bash
-docker exec -it plotline-mysql mysql -u root -p
+bun run db:reset                              # only for databases whose name ends in _dev
+bun run import:openlibrary --download --limit 200000   # a sample of the book catalog
 ```
 
-Then run:
+See [docs/database.md](docs/database.md) and [docs/imports.md](docs/imports.md).
 
-```sql
-CREATE DATABASE IF NOT EXISTS plotline_prd;
-USE plotline_prd;
-```
+## Connecting from your PC
 
-Run SQL scripts in order:
+**SQL client** (DBeaver, or VS Code with SQLTools and its PostgreSQL driver):
+- Host: `DB_HOST`, port: `POSTGRES_PORT`
+- Database: `POSTGRES_DB_NAME`
+- Username and password: `POSTGRES_USER` and `POSTGRES_PASSWORD`
 
-1. `./db/creation/initial-book-tables.sql`
-2. `./db/creation/initial-user-tables.sql`
-3. `./db/creation/initial-shelf-tables.sql`
-
-### Granting Remote Access (for homelab setups)
-
-If running MySQL on a remote server, connect to the container and run:
-
-```sql
-ALTER USER 'yourusername'@'192.168.1.%' IDENTIFIED BY 'yourpassword';
-GRANT ALL PRIVILEGES ON plotline_prd.* TO 'yourusername'@'192.168.1.%';
-FLUSH PRIVILEGES;
-```
-
-### Connecting from Your PC
-
-Couple of options here, you can use DBeaver or SQLTools. DBeaver is a lot more comprehensive (use similar details as below).
-
-**Using VS Code (SQLTools extension)**:
-- Install `SQLTools` and `SQLTools MySQL`
-- Create a new connection:
-  - Host: `127.0.0.1` (your server IP, make it localhost if running on same machine)
-  - Port: `3306`
-  - Username: `yourusername`
-  - Password: `yourpassword`
-  - Database: `plotline_prd`
-
-**Using Command Line**:
+**Command line**:
 ```bash
-mysql -h 127.0.0.1 -u yourusername -p
+psql -h <DB_HOST> -p 5433 -U yourusername plotline_dev
 ```
 
-**Using Redis**:
-- Install `Redis` extension for VS Code
-- Add connection with:
-  - Host: `127.0.0.1` (your server IP, make it localhost if running on same machine)
-  - Port: `6379`
-  - Password: from `.env` REDIS_PASSWORD
+**Redis** (e.g. the Redis extension for VS Code): host `DB_HOST`, port `REDIS_PORT`, password `REDIS_PASSWORD`.

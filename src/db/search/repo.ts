@@ -1,22 +1,29 @@
+import { fuzzyMinLength, fuzzyThreshold, maxRankedCandidates } from '../../config/search.ts';
 import { uniqueBy } from '../../utils/general.ts';
 import type { SearchResult } from '../../schemas/search.ts';
-import { toTsQuery } from './query.ts';
+import { searchWords, toTsQuery } from './query.ts';
 import * as lookups from './sql/lookups.ts';
 
 type Row = Record<string, any>;
 
-// Searches our own catalog: title matches first, then works by matching contributors.
+// Searches our own catalog, best matches first:
+//   1. exact titles  2. full-text title matches  3. works by matching contributors
+//   4. typo-tolerant matches, only when 1-3 found nothing (see fuzzyMinLength)
 export async function searchCatalog(query: string, limit: number): Promise<SearchResult[]> {
     const text = query.trim();
     const tsQuery = toTsQuery(text);
     if (!tsQuery) return [];
 
-    // Both run at once; contributor matches only fill whatever room the titles leave.
-    const [byTitle, byContributor] = await Promise.all([
-        lookups.searchWorksByTitle(tsQuery, text, limit),
+    const [exact, byTitle, byContributor] = await Promise.all([
+        lookups.searchWorksByExactTitle(text, limit),
+        lookups.searchWorksByTitle(tsQuery, limit, maxRankedCandidates),
         lookups.searchWorksByContributor(tsQuery, limit),
     ]);
-    const works: Row[] = uniqueBy([...byTitle, ...byContributor], (r: Row) => r.id).slice(0, limit);
+    let works: Row[] = uniqueBy([...exact, ...byTitle, ...byContributor], (r: Row) => r.id);
+    if (!works.length && searchWords(text).join('').length >= fuzzyMinLength) {
+        works = [...await lookups.searchWorksFuzzy(text, fuzzyThreshold, limit)];
+    }
+    works = works.slice(0, limit);
     if (!works.length) return [];
 
     const ids = works.map(w => w.id as string);

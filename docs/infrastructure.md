@@ -6,7 +6,6 @@ Postgres and Redis run as Docker containers on a separate Docker host on the LAN
 
 | Container | Host port | Notes |
 |---|---|---|
-| `plotline-mysql` | `MYSQL_PORT` (3306) | MySQL 8. **No longer used by the app**; kept until the move to Postgres is confirmed, then removed |
 | `plotline-postgres` | `POSTGRES_PORT` (5433) → 5432 in the container | Postgres 18. The database and user are only created on first start with an empty data folder. Not on 5432 because another stack already uses it. Memory is tuned for a 16 GB host shared with other containers: a 1 GB cache of its own (`shared_buffers`), with the rest left to the OS page cache |
 | `plotline-redis` | `REDIS_PORT` (6380) → 6379 in the container | Not on 6379 because another stack on the host already publishes that port. Capped at 256 MB, evicting the least-used keys, since it's only a cache |
 

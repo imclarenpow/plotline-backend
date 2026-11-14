@@ -109,6 +109,13 @@ describeDb("imports repo", () => {
         expect(byAuthor.map(r => r.olid)).toContain(workOlid);
     });
 
+    test("searchCatalog finds the work despite a typo, and by exact title", async () => {
+        const typo = `plotlnie ${word}`; // full-text can't match 'plotlnie', so trigram matching runs
+        expect((await searchCatalog(typo, 20)).map(r => r.olid)).toContain(workOlid);
+        const [exact] = await searchCatalog(`PLOTLINE ${word.toUpperCase()}`, 20);
+        expect(exact?.olid).toBe(workOlid);
+    });
+
     test("import runs record their outcome", async () => {
         const run = await imports.startImportRun('openlibrary');
         await imports.finishImportRun(run, { works: { created: 1 } }, new Error('boom'));

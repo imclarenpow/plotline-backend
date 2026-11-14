@@ -62,7 +62,7 @@ describeDb("read-through handlers", () => {
     test("searchHandler answers from OpenLibrary when the catalog fails, without caching", async () => {
         const query = `plotline-test-down-${suffix}`;
         keys.push(`${searchPrefix}:${query}`);
-        const catalogSpy = spyOn(searchRepo, 'searchCatalog').mockRejectedValue(new Error('MySQL down'));
+        const catalogSpy = spyOn(searchRepo, 'searchCatalog').mockRejectedValue(new Error('Postgres down'));
         fetchSpy.mockImplementation((async () => Response.json({ docs: [{ key: `/works/OL${suffix}4W`, title: 'Stub' }] })) as any);
         try {
             const result = await body(await searchHandler(query));
