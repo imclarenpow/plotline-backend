@@ -1,3 +1,4 @@
+import { SQL } from "bun";
 import type { DateString, ExternalId, SourceName, UUID } from "./types.ts";
 
 export function assertDateString(date: string): DateString {
@@ -43,3 +44,8 @@ export function newUuid(): UUID {
     return Bun.randomUUIDv7() as UUID;
 }
 
+// A unique constraint or primary key rejected the write (SQLSTATE 23505), e.g. because a
+// concurrent request inserted the same external ID first.
+export function isUniqueViolation(error: unknown): boolean {
+    return error instanceof SQL.PostgresError && error.errno === '23505';
+}

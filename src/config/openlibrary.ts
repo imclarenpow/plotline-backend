@@ -13,10 +13,13 @@ function bookCoverUrlById(coverId: number, size: CoverSize = 'M'): string {
     return `${BOOK_COVERS_BY_ID_URL}${coverId}-${size}.jpg`;
 }
 
+// A request that takes longer than this counts as OpenLibrary being unreachable.
+const TIMEOUT_MS = 10_000;
+
 const userAgent = {
     'User-Agent': `${process.env.APP_NAME} ${process.env.APP_EMAIL_CONTACT}`,
 }
 
 export {
-    DOMAIN, BOOK_COVERS_URL, BOOK_COVERS_BY_ID_URL, bookCoverUrlById, AUTHOR_COVERS_URL, URL, SEARCH_PARAMS, userAgent
+    DOMAIN, BOOK_COVERS_URL, BOOK_COVERS_BY_ID_URL, bookCoverUrlById, AUTHOR_COVERS_URL, URL, SEARCH_PARAMS, TIMEOUT_MS, userAgent
 }

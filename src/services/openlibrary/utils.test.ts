@@ -25,7 +25,7 @@ describe("toSearchResults", () => {
         });
         expect(results).toEqual([{
             id: null,
-            olid: "OL893415W",
+            ref: { source: "openlibrary", id: "OL893415W" },
             title: "Dune",
             subtitle: null,
             authors: ["Frank Herbert"],

@@ -1,6 +1,6 @@
 # Imports
 
-Book data comes into the catalog from **bulk data dumps**, not live API calls. Search and book pages then read our own Postgres tables, and the live APIs are only a fallback.
+Book data comes into the catalog from **bulk data dumps**, not live API calls. Search and book pages then read our own Postgres tables, and the live APIs are only a fallback: for one book at a time, when someone opens a book the dump import didn't include (see [On-demand imports](#on-demand-imports)).
 
 This is required, not just faster: OpenLibrary's usage guidelines say its APIs "are not intended to serve as a bulk data backend or high-traffic commercial infrastructure" and point heavy users at the monthly dumps.
 
@@ -39,6 +39,7 @@ Each run is recorded in `import_runs` with its status, per-step counts (`stats`)
 | `src/import/isbn.ts` | ISBN-10/13 validation (check digits) and ISBN-10 → ISBN-13 conversion |
 | `src/import/{source}/parse.ts` | Pure functions: one dump record → `ImportWork` / `ImportEdition` / `ImportContributor`. Validates with Zod |
 | `src/import/{source}/run.ts` | The CLI: streams the dumps through the parser into the repo |
+| `src/import/openlibrary/work.ts` | Imports one work from the live API, for `/api/works/resolve` (see below) |
 | `src/db/imports/repo.ts` | Batch writes, one transaction per batch (`IMPORT_BATCH_SIZE`). Source-independent |
 | `src/config/imports.ts` | Dump URLs, data folder, language filter, batch size |
 
@@ -65,6 +66,19 @@ The script makes five streaming passes, because each step needs IDs that an earl
 Each pass checks a line's key against the ID sets before parsing its JSON, and editions are pre-filtered on ISBN and language with a substring check, so most lines are never parsed. `--limit` applies to the edition lines read in passes 1 and 5.
 
 What isn't imported yet: edition titles (`editions.title` is only for titles that differ from the work's), physical format, series, and works without any qualifying edition.
+
+## On-demand imports
+
+`/api/works/resolve/openlibrary/:olid` (see [api.md](api.md#works)) imports a work the catalog doesn't have yet, so every book someone opens gets a work row that shelves, reads and XP can point at. `importOpenLibraryWork` in `src/import/openlibrary/work.ts`:
+
+1. Fetches `/works/{olid}.json`. Redirect records (OpenLibrary merged the work into another) are followed up to 3 times; a deleted or missing work is a `404`. If the surviving work is already in the catalog, it's used and nothing more is fetched
+2. Fetches the work's authors that aren't in the catalog yet, and up to 100 editions
+3. Parses them with the dump parsers (`parseWorkRecord`, `parseAuthorRecord`, `parseEditionRecord`: the API returns the same JSON as the dumps) and writes them with the same `src/db/imports/repo.ts` functions, so the same rules apply, including the ISBN and language filter for editions
+4. Sets that work's `edition_count`, and links any IDs that redirected to it as extra OpenLibrary IDs for the work
+
+The next monthly import treats these rows like any other: matched by external ID, empty fields filled. If two requests import the same new work at once, the second hits a unique constraint on the external ID, and its writes run again and link to the rows the first one wrote.
+
+This is one book per request, made because a person opened it, so it stays within OpenLibrary's guidelines. Don't loop over it to fill the catalog: use the dumps.
 
 ## Adding a source
 

@@ -73,3 +73,22 @@ export function updateWorkXp(workId: string, xp: number, xpVersion: number, db: 
 export function deleteWorkById(workId: string, db: SQL = pg) {
     return db`DELETE FROM works WHERE id = ${workId};`;
 }
+
+// Another ID for a work that's already linked, e.g. an OpenLibrary ID that now redirects to it.
+// An ID that already points somewhere is left alone.
+export function insertWorkExternalIdIfNew(workId: string, source: SourceName, externalId: string, db: SQL = pg) {
+    return db`
+        INSERT INTO work_external_ids (source_id, external_id, work_id)
+        VALUES ((SELECT id FROM sources WHERE name = ${source}), ${externalId}, ${workId})
+        ON CONFLICT DO NOTHING;
+    `;
+}
+
+// works.edition_count for one work; imports refresh every work's when they finish.
+export function refreshEditionCount(workId: string, db: SQL = pg) {
+    return db`
+        UPDATE works
+        SET edition_count = (SELECT COUNT(*)::int FROM editions WHERE work_id = ${workId})
+        WHERE id = ${workId};
+    `;
+}

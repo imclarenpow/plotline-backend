@@ -1,31 +1,41 @@
 import * as ol from '../../config/openlibrary.ts';
 import { CoverSizeSchema } from '../../schemas/openlibrary.ts';
 import { AuthorOlidSchema, WorkOlidSchema } from '../../schemas/openlibrary.ts';
+import { HttpError } from '../../utils/api.ts';
 
-export async function getWork(workId: string): Promise<any> {
-    const validated = WorkOlidSchema.safeParse(workId);
-    if (!validated.success) { throw new Error(`Invalid work ID: ${workId}`); }
+export const UNREACHABLE = 'Open Library API unreachable';
 
-    const res = await fetch(`${ol.URL}/works/${workId}.json`, { headers: ol.userAgent });
-    if (!res.ok) throw new Error(`Failed to fetch work data for workId: ${workId}`);
+// Network failures, timeouts, rate limits and 5xx answers mean OpenLibrary can't serve us
+// right now (503). A 404 returns null so callers can tell "doesn't exist" from "failed".
+async function fetchJson(url: string, what: string): Promise<any | null> {
+    let res: Response;
+    try {
+        res = await fetch(url, { headers: ol.userAgent, signal: AbortSignal.timeout(ol.TIMEOUT_MS) });
+    } catch {
+        throw new HttpError(503, UNREACHABLE);
+    }
+    if (res.status === 404) return null;
+    if (res.status === 429 || res.status >= 500) throw new HttpError(503, UNREACHABLE);
+    if (!res.ok) throw new Error(`Failed to fetch ${what}: ${res.status}`);
     return await res.json();
 }
-// we could generalise these 2 functions but it is more readable to have them here.
-export async function getEditions(workId: string): Promise<any> {
-    const validated = WorkOlidSchema.safeParse(workId);
-    if (!validated.success) { throw new Error(`Invalid work ID: ${workId}`); }
-    const res = await fetch(`${ol.URL}/works/${workId}/editions.json?limit=100`, { headers: ol.userAgent });
-    if (!res.ok) throw new Error(`Failed to fetch editions for workId: ${workId}`);
-    return await res.json();
+
+// null when OpenLibrary has no such work.
+export async function getWork(workId: string): Promise<any | null> {
+    if (!WorkOlidSchema.safeParse(workId).success) throw new HttpError(400, `Invalid work ID: ${workId}`);
+    return fetchJson(`${ol.URL}/works/${workId}.json`, `work ${workId}`);
 }
 
-export async function getAuthor(authorId: string): Promise<any> {
-    const validated = AuthorOlidSchema.safeParse(authorId);
-    if (!validated.success) { throw new Error(`Invalid author ID: ${authorId}`); }
+// { entries: [...] }, or null when OpenLibrary has no such work.
+export async function getEditions(workId: string): Promise<any | null> {
+    if (!WorkOlidSchema.safeParse(workId).success) throw new HttpError(400, `Invalid work ID: ${workId}`);
+    return fetchJson(`${ol.URL}/works/${workId}/editions.json?limit=100`, `editions of ${workId}`);
+}
 
-    const res = await fetch(`${ol.URL}/authors/${authorId}.json`, { headers: ol.userAgent });
-    if (!res.ok) throw new Error(`Failed to fetch author ${authorId}: ${res.status}`);
-    return await res.json();
+// null when OpenLibrary has no such author.
+export async function getAuthor(authorId: string): Promise<any | null> {
+    if (!AuthorOlidSchema.safeParse(authorId).success) throw new HttpError(400, `Invalid author ID: ${authorId}`);
+    return fetchJson(`${ol.URL}/authors/${authorId}.json`, `author ${authorId}`);
 }
 
 export async function getBookCover(coverId: number, size: string): Promise<string> {
@@ -43,12 +53,5 @@ export async function getAuthorCover(coverId: string, size: string): Promise<str
 
 export async function search(query: string, number_returned: number): Promise<any> {
     const url = `${ol.URL}/search.json?q=${encodeURIComponent(query)}&fields=${ol.SEARCH_PARAMS}&limit=${number_returned}`;
-    try {
-        const res = await fetch(url, { headers: ol.userAgent });
-        if (!res.ok) throw new Error(`Failed to search for ${query}: ${res.status}`);
-        const data = await res.json() as { docs?: any[] };
-        return data;
-    } catch (error) {
-        throw error;
-    }
+    return (await fetchJson(url, `search for ${query}`)) ?? { docs: [] };
 }

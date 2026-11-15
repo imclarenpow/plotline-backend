@@ -17,7 +17,7 @@ export function toSearchResults(payload: unknown): SearchResult[] {
         const doc = parsed.data;
         results.push({
             id: null,
-            olid: olId(doc.key),
+            ref: { source: 'openlibrary', id: olId(doc.key) },
             title: doc.title,
             subtitle: doc.subtitle ?? null,
             authors: doc.author_name ?? [],

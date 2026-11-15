@@ -99,21 +99,21 @@ describeDb("imports repo", () => {
         const [byTitle] = await searchCatalog(word.slice(0, -2), 20); // prefix match
         expect(byTitle).toMatchObject({
             title: `Plotline ${word}`,
-            olid: workOlid,
+            ref: { source: 'openlibrary', id: workOlid },
             authors: [`Author ${word}`],
             coverUrl: 'https://covers.openlibrary.org/b/id/1-M.jpg',
             source: 'catalog',
         });
 
         const byAuthor = await searchCatalog(`author ${word}`, 20);
-        expect(byAuthor.map(r => r.olid)).toContain(workOlid);
+        expect(byAuthor.map(r => r.ref?.id)).toContain(workOlid);
     });
 
     test("searchCatalog finds the work despite a typo, and by exact title", async () => {
         const typo = `plotlnie ${word}`; // full-text can't match 'plotlnie', so trigram matching runs
-        expect((await searchCatalog(typo, 20)).map(r => r.olid)).toContain(workOlid);
+        expect((await searchCatalog(typo, 20)).map(r => r.ref?.id)).toContain(workOlid);
         const [exact] = await searchCatalog(`PLOTLINE ${word.toUpperCase()}`, 20);
-        expect(exact?.olid).toBe(workOlid);
+        expect(exact?.ref?.id).toBe(workOlid);
     });
 
     test("import runs record their outcome", async () => {

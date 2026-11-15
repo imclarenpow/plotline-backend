@@ -24,6 +24,13 @@ export const WorkSchema = z.object({
 
 export const NewWorkSchema = WorkSchema.omit({ id: true, xp: true, xpVersion: true });
 
+// A work as /api/works/:id returns it: the work plus who made it and a cover.
+export const WorkDetailSchema = WorkSchema.extend({
+    externalIds: z.array(ExternalIdSchema),
+    contributors: z.array(z.object({ id: UUIDSchema, name: z.string(), role: z.string() })),
+    coverUrl: z.string().nullable(),
+});
+
 export const EditionSchema = z.object({
     id: UUIDSchema,
     workId: UUIDSchema,
@@ -41,5 +48,6 @@ export const NewEditionSchema = EditionSchema.omit({ id: true, workId: true });
 
 export type Work = z.infer<typeof WorkSchema>;
 export type NewWork = z.infer<typeof NewWorkSchema>;
+export type WorkDetail = z.infer<typeof WorkDetailSchema>;
 export type Edition = z.infer<typeof EditionSchema>;
 export type NewEdition = z.infer<typeof NewEditionSchema>;
