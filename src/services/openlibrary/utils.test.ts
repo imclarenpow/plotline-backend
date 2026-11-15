@@ -1,114 +1,52 @@
-import { expect, test, describe, beforeAll } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
+import { olId, toSearchResults } from './utils.ts';
 
-const hasRedisEnv = !!process.env.REDIS_URL;
-
-if (!hasRedisEnv) {
-    describe.skip("cleanWorkOlid", () => {
-        test("skipped because Redis is not configured", () => {});
+describe("olId", () => {
+    test("strips the path from any OpenLibrary key", async () => {
+        expect(olId("/works/OL123456W")).toBe("OL123456W");
+        expect(olId("/authors/OL1A")).toBe("OL1A");
     });
 
-    describe.skip("transformBookOLDataToDBFormat", () => {
-        test("skipped because Redis is not configured", () => {});
+    test("leaves a bare ID unchanged", async () => {
+        expect(olId("OL123456W")).toBe("OL123456W");
     });
-} else {
-    let cleanWorkOlid: (workKey: string) => Promise<string> | string;
-    let transformBookOLDataToDBFormat: (bookData: any) => Promise<any>;
+});
 
-    beforeAll(async () => {
-        const utils = await import("./utils.ts");
-        cleanWorkOlid = utils.cleanWorkOlid;
-        transformBookOLDataToDBFormat = utils.transformBookOLDataToDBFormat;
-    });
-
-    describe("cleanWorkOlid", () => {
-        test("should remove /works/ prefix from OLID", async () => {
-            const result = await cleanWorkOlid("/works/OL123456W");
-            expect(result).toBe("OL123456W");
+describe("toSearchResults", () => {
+    test("maps search.json docs to search results", async () => {
+        const results = toSearchResults({
+            docs: [{
+                key: "/works/OL893415W",
+                title: "Dune",
+                author_name: ["Frank Herbert"],
+                first_publish_year: 1965,
+                cover_i: 11481354,
+            }],
         });
-
-        test("should handle OLID without prefix", async () => {
-            const result = await cleanWorkOlid("OL123456W");
-            expect(result).toBe("OL123456W");
-        });
-
-        test("should return empty string for /works/ only", async () => {
-            const result = await cleanWorkOlid("/works/");
-            expect(result).toBe("");
-        });
+        expect(results).toEqual([{
+            id: null,
+            olid: "OL893415W",
+            title: "Dune",
+            subtitle: null,
+            authors: ["Frank Herbert"],
+            firstPublishedYear: 1965,
+            coverUrl: "https://covers.openlibrary.org/b/id/11481354-M.jpg",
+            source: "openlibrary",
+        }]);
     });
 
-    describe("transformBookOLDataToDBFormat", () => {
-        test("should transform valid book data to DB format", async () => {
-            const bookData = {
-                title: "The Great Gatsby",
-                description: "A classic novel",
-                number_of_pages: 180,
-                key: "/works/OL123456W",
-                covers: [12345],
-                identifiers: { isbn: "123456789" }
-            };
-
-            const result = await transformBookOLDataToDBFormat(bookData);
-
-            expect(result).toHaveProperty("title");
-            expect(result).toHaveProperty("bio");
-            expect(result).toHaveProperty("number_of_pages");
-            expect(result).toHaveProperty("work_id");
-            expect(result).toHaveProperty("cover_id");
-            expect(result).toHaveProperty("sources");
-        });
-
-        test("should throw error for null book data", async () => {
-            await expect(
-                transformBookOLDataToDBFormat(null)
-            ).rejects.toThrow("No book data provided");
-        });
-
-        test("should handle missing optional fields", async () => {
-            const bookData = {
-                title: "Minimal Book",
-                key: "/works/OL999999W"
-            };
-
-            const result = await transformBookOLDataToDBFormat(bookData);
-
-            expect(result.number_of_pages).toBe(0);
-            expect(result.cover_id).toBeNull();
-            expect(result.sources).toBeDefined();
-        });
-
-        test("should clean title string", async () => {
-            const bookData = {
-                title: "  Book\nWith\tWhitespace  ",
-                key: "/works/OL123456W"
-            };
-
-            const result = await transformBookOLDataToDBFormat(bookData);
-
-            expect(result.title).toBe("Book With Whitespace");
-        });
-
-        test("should handle missing covers array", async () => {
-            const bookData = {
-                title: "No Cover Book",
-                key: "/works/OL123456W"
-            };
-
-            const result = await transformBookOLDataToDBFormat(bookData);
-
-            expect(result.cover_id).toBeNull();
-        });
-
-        test("should use first cover from covers array", async () => {
-            const bookData = {
-                title: "Multi Cover Book",
-                key: "/works/OL123456W",
-                covers: [111, 222, 333]
-            };
-
-            const result = await transformBookOLDataToDBFormat(bookData);
-
-            expect(result.cover_id).toBe(111);
-        });
+    test("defaults missing optional fields", async () => {
+        const [result] = toSearchResults({ docs: [{ key: "/works/OL1W", title: "Minimal" }] });
+        expect(result).toMatchObject({ authors: [], subtitle: null, firstPublishedYear: null, coverUrl: null });
     });
-}
+
+    test("skips docs that don't validate", async () => {
+        const results = toSearchResults({ docs: [{ key: "/books/OL1M", title: "Edition" }, { key: "/works/OL2W" }] });
+        expect(results).toEqual([]);
+    });
+
+    test("returns nothing for payloads without a docs array", async () => {
+        expect(toSearchResults({})).toEqual([]);
+        expect(toSearchResults(null)).toEqual([]);
+    });
+});

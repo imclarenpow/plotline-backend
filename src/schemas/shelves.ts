@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { UUIDSchema, DateTimeSchema } from './common.ts';
-import { BookSchema } from './books.ts';
+import { WorkSchema } from './works.ts';
 
 export const ShelfSchema = z.object({
     id: UUIDSchema,
@@ -8,7 +8,7 @@ export const ShelfSchema = z.object({
     name: z.string().min(1).max(50),
     bio: z.string().optional(),
     createdAt: DateTimeSchema,
-    books: z.array(BookSchema).optional()
+    works: z.array(WorkSchema).optional()
 });
 
 export type Shelf = z.infer<typeof ShelfSchema>;

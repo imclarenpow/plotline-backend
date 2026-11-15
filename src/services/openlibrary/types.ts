@@ -1,3 +1,3 @@
-import type { RemoteId } from "../../db/types";
-import type { Book } from "../../db/books/types";
+import type { ExternalId } from "../../db/types";
+import type { Work } from "../../db/works/types";
 import * as utils from "../../utils/general";
