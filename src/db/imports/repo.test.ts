@@ -125,18 +125,30 @@ describeDb("imports repo", () => {
         await pg`DELETE FROM import_runs WHERE id = ${run}`;
     });
 
-    test("lastImportedDumpDate returns the dump date of the last successful run", async () => {
+    // A successful finish refreshes edition counts and vacuums the whole catalog, which takes
+    // well over the default 5 s timeout once the dev database holds an import.
+    test("lastImportedDumpDate returns the dump date of the last successful full run", async () => {
         const date = '2099-01-31'; // a date no real run will have
-        const run = await imports.startImportRun('openlibrary');
-        await imports.finishImportRun(run, { dump: { date } });
-        expect(await imports.lastImportedDumpDate('openlibrary')).toBe(date);
+        const runs: string[] = [];
+        try {
+            const run = await imports.startImportRun('openlibrary');
+            runs.push(run);
+            await imports.finishImportRun(run, { dump: { date } });
+            expect(await imports.lastImportedDumpDate('openlibrary')).toBe(date);
 
-        const failed = await imports.startImportRun('openlibrary');
-        await imports.finishImportRun(failed, { dump: { date: '2099-02-28' } }, new Error('boom'));
-        expect(await imports.lastImportedDumpDate('openlibrary')).toBe(date); // failed runs don't count
+            const failed = await imports.startImportRun('openlibrary');
+            runs.push(failed);
+            await imports.finishImportRun(failed, { dump: { date: '2099-02-28' } }, new Error('boom'));
+            expect(await imports.lastImportedDumpDate('openlibrary')).toBe(date); // failed runs don't count
 
-        await pg`DELETE FROM import_runs WHERE id IN ${pg([run, failed])}`;
-    });
+            const sample = await imports.startImportRun('openlibrary');
+            runs.push(sample);
+            await imports.finishImportRun(sample, { dump: { date: null } });
+            expect(await imports.lastImportedDumpDate('openlibrary')).toBe(date); // nor do sample runs
+        } finally {
+            await pg`DELETE FROM import_runs WHERE id IN ${pg(runs)}`;
+        }
+    }, 300_000);
 
     test("an error with an empty message still marks the run failed", async () => {
         const run = await imports.startImportRun('openlibrary');
