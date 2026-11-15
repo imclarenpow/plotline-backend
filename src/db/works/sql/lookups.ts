@@ -85,3 +85,28 @@ export function getWorkSignals(workId: string) {
         ORDER BY s.priority DESC;
     `;
 }
+
+// Contributors in display order, one row per role.
+export function getWorkContributors(workId: string) {
+    return pg`
+        SELECT c.id, c.name, r.name AS role
+        FROM work_contributors wc
+        JOIN contributors c ON c.id = wc.contributor_id
+        JOIN contributor_roles r ON r.id = wc.role_id
+        WHERE wc.work_id = ${workId}
+        ORDER BY wc.position, r.name;
+    `;
+}
+
+// Any one cover, as search results pick theirs.
+export function getWorkCover(workId: string) {
+    return pg`
+        SELECT MAX(cover_url) AS cover_url
+        FROM editions
+        WHERE work_id = ${workId} AND cover_url IS NOT NULL;
+    `;
+}
+
+export function workExists(workId: string) {
+    return pg`SELECT 1 FROM works WHERE id = ${workId};`;
+}

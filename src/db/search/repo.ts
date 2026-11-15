@@ -42,7 +42,7 @@ export async function searchCatalog(query: string, limit: number): Promise<Searc
 
     return works.map(w => ({
         id: w.id,
-        olid: olidByWork.get(w.id) ?? null,
+        ref: olidByWork.has(w.id) ? { source: 'openlibrary' as const, id: olidByWork.get(w.id)! } : null,
         title: w.title,
         subtitle: w.subtitle ?? null,
         authors: authors.get(w.id) ?? [],

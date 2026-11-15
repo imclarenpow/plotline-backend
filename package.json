@@ -7,7 +7,7 @@
     "start": "bun run ./src/index.ts",
     "dev": "bun --watch run ./src/index.ts",
     "test:git": "bun test src",
-    "test:db": "RUN_DB_TESTS=1 bun test src/db",
+    "test:db": "RUN_DB_TESTS=1 bun test src",
     "db:reset": "bun run db/reset.ts",
     "import:openlibrary": "bun run src/import/openlibrary/run.ts"
   },

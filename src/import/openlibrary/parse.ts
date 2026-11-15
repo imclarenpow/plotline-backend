@@ -152,7 +152,13 @@ function pageCount(value: unknown): number | null {
 
 // Returns the edition if it has a valid ISBN, belongs to a work and passes the language filter.
 export function parseEdition(json: string, filter: EditionFilter): ImportEdition | null {
-    const parsed = EditionJson.safeParse(parseJson(json));
+    return parseEditionRecord(parseJson(json), filter);
+}
+
+// The same, for a record already parsed (e.g. from the OpenLibrary API, which returns
+// the same JSON as the dumps).
+export function parseEditionRecord(record: unknown, filter: EditionFilter): ImportEdition | null {
+    const parsed = EditionJson.safeParse(record);
     if (!parsed.success) return null;
     const e = parsed.data;
     if (olNumber(e.key, 'M') == null) return null;
@@ -213,8 +219,14 @@ export function workAuthorKeys(authors: unknown[] | undefined): string[] {
     return [...keys];
 }
 
-export function parseWork(json: string): { work: ImportWork; contributors: ImportWorkContributors } | null {
-    const parsed = WorkJson.safeParse(parseJson(json));
+export type ParsedWork = { work: ImportWork; contributors: ImportWorkContributors };
+
+export function parseWork(json: string): ParsedWork | null {
+    return parseWorkRecord(parseJson(json));
+}
+
+export function parseWorkRecord(record: unknown): ParsedWork | null {
+    const parsed = WorkJson.safeParse(record);
     if (!parsed.success) return null;
     const w = parsed.data;
     const title = clip(w.title, 255);
@@ -249,7 +261,11 @@ const AuthorJson = z.object({
 });
 
 export function parseAuthor(json: string): ImportContributor | null {
-    const parsed = AuthorJson.safeParse(parseJson(json));
+    return parseAuthorRecord(parseJson(json));
+}
+
+export function parseAuthorRecord(record: unknown): ImportContributor | null {
+    const parsed = AuthorJson.safeParse(record);
     if (!parsed.success) return null;
     const a = parsed.data;
     const name = clip(a.name, 255) ?? clip(a.personal_name, 255);

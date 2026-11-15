@@ -31,7 +31,7 @@ Env vars (in `.env`, not committed): `DB_HOST`, `POSTGRES_USER`, `POSTGRES_PASSW
 ```bash
 bun run dev        # watch mode
 bun run test:git   # unit tests; DB tests are skipped
-bun run test:db    # DB tests (live Postgres + Redis): bindings + repo integration
+bun run test:db    # every test, including DB tests against live Postgres + Redis
 bun run db:reset   # rebuild the dev database (only names ending in _dev)
 bun run import:openlibrary --download   # import OpenLibrary dumps into the catalog
 bunx tsc --noEmit  # typecheck
@@ -65,7 +65,7 @@ docs/               ← see the table above
 
 ## Coding practices
 
-- **Reuse helpers** (`jsonResponse`, `newUuid`, `toDateString`, `toExternalIds`) instead of writing the same logic again; extract shared logic rather than duplicating it
+- **Reuse helpers** (`jsonResponse`, `errorResponse`, `newUuid`, `toDateString`, `toExternalIds`) instead of writing the same logic again; extract shared logic rather than duplicating it
 - **Compose:** SQL modules expose focused functions, repos compose them, handlers call repos
 - **Validate at boundaries:** use Zod before calling external APIs or accepting user input, not between trusted internal layers
 - **Branded types:** `UUID`, `DateString` and `ExternalId` from `src/db/types.ts`
@@ -75,7 +75,7 @@ docs/               ← see the table above
 1. **Schema**: Zod schema in `src/schemas/`, export `z.infer<>` types
 2. **SQL**: `src/db/{domain}/sql/lookups.ts` and `mutations.ts`. Mutations take `db: SQL = pg` so they can run in transactions
 3. **Repo**: `src/db/{domain}/repo.ts`
-4. **Handler**: `src/api/`; try/catch returning `{ error }` with a status
+4. **Handler**: `src/api/`; throw `HttpError(status, message)` for 4xx/503, anything else is a 500
 5. **Route**: wire into `src/index.ts`
 6. **Tests**: colocated `.test.ts`; all test functions `async`
 7. **Docs**: update the relevant `docs/` page
@@ -86,13 +86,15 @@ Route pattern:
 "/api/resource/:param": async req => {
     try {
         return await myHandler(req.params.param);
-    } catch (error: any) {
-        return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    } catch (error) {
+        return errorResponse(error);
     }
 }
 ```
 
-Redis read-through pattern (see `src/api/books.ts`): get cached → return if hit → fetch → cache → return.
+Redis read-through pattern (see `src/api/search.ts`): get cached → return if hit → fetch → cache → return.
+
+Works are addressed by our UUID in routes, never by a source's ID; source IDs go through `/api/works/resolve/:source/:externalId` (see docs/api.md).
 
 ## Testing
 

@@ -2,11 +2,22 @@
 
 All routes are `GET` and wired in `src/index.ts`. Base URL in development: `http://localhost:${BACKEND_PORT}` (3001).
 
-Every error returns `{ "error": "<message>" }` with status `500`. Responses are JSON, sent with `jsonResponse()`.
+Responses are JSON, sent with `jsonResponse()`. Errors are `{ "error": "<message>" }`, sent with `errorResponse()`:
+
+| Status | When |
+|---|---|
+| `400` | A malformed ID, or an unknown source |
+| `404` | No such work, in the catalog or the source |
+| `503` | `{ "error": "Open Library API unreachable" }`: OpenLibrary timed out (10s), refused the connection, rate-limited us or answered 5xx |
+| `500` | Anything else |
+
+Handlers throw `HttpError(status, message)` from `src/utils/api.ts` for the first three; anything else thrown is a `500`.
+
+**Works are addressed by our own ID** (a UUID), never by a source's. A source's ID only gets you to a work through `/api/works/resolve`, which returns our ID along with the work. Clients should store our ID: OpenLibrary IDs change when works are merged, and works from other sources (e.g. GCD) may have no OpenLibrary ID at all.
 
 ## Search
 
-`/api/search/:query` searches **our own catalog** (Postgres full-text, filled by [imports](imports.md)) and caches the response in Redis for 24h under `search:v2:{query}`. The `v2` changes whenever the cached shape does, so old entries are never served.
+`/api/search/:query` searches **our own catalog** (Postgres full-text, filled by [imports](imports.md)) and caches the response in Redis for 24h under `search:v3:{query}`. The `v3` changes whenever the cached shape does, so old entries are never served.
 
 - Results come in this order:
   1. Exact titles, ignoring case and accents (`love` puts books titled *Love* first)
@@ -23,22 +34,28 @@ Response (`SearchResponse` in `src/schemas/search.ts`), up to 20 results (`confi
 
 ```json
 { "query": "dune", "results": [
-  { "id": "0190…", "olid": "OL893415W", "title": "Dune", "subtitle": null,
+  { "id": "0190…", "ref": { "source": "openlibrary", "id": "OL893415W" }, "title": "Dune", "subtitle": null,
     "authors": ["Frank Herbert"], "firstPublishedYear": 1965,
     "coverUrl": "https://covers.openlibrary.org/b/id/11481354-M.jpg", "source": "catalog" }
 ] }
 ```
 
-`id` is our work ID and is `null` for results only OpenLibrary has. `olid` opens the book with `/api/books/:olid`.
+To open a result: if `id` is set, call `/api/works/:id`; if it's `null` (only OpenLibrary has the book), call `/api/works/resolve/{ref.source}/{ref.id}`, which imports it and returns its new `id`. `ref` is the work's ID in a source (the OpenLibrary ID, for now), and is also how catalog and OpenLibrary results are deduplicated.
 
-## Books (OpenLibrary)
+## Works
 
-These read from OpenLibrary through a Redis read-through cache (24h TTL). They don't read the catalog yet.
+| Route | Returns |
+|---|---|
+| `/api/works/:id` | One work (`WorkDetail` in `src/schemas/works.ts`): its fields, `externalIds`, `contributors` (`{ id, name, role }`, in display order, one entry per role) and one `coverUrl`. Catalog only: never calls a source |
+| `/api/works/:id/editions` | `{ workId, editions }`: the work's editions in the catalog, oldest first |
+| `/api/works/resolve/:source/:externalId` | The same as `/api/works/:id`, for the work with that ID in a source, e.g. `/api/works/resolve/openlibrary/OL893415W` |
 
-| Route | Returns | Redis key |
-|---|---|---|
-| `/api/books/:query` | One OpenLibrary work. `:query` must be a work ID (`OL{digits}W`) | `work:{id}` |
-| `/api/books/:query/editions` | Up to 100 editions of a work | `edition:{id}` |
+These read Postgres directly and aren't cached in Redis: they're indexed lookups on our own data, and a cache would have to be cleared whenever XP or an import changes a work.
+
+**Resolve** looks the ID up in `work_external_ids`, so any source's ID works (`/resolve/goodreads/…` finds a work the OpenLibrary import attached a Goodreads ID to). If the catalog doesn't have it:
+
+- **`openlibrary`** fetches the work, its authors and up to 100 editions from the API and imports them, the way the dump import would (see [imports.md](imports.md#on-demand-imports)). The next request is a plain catalog lookup. The ID must match `OL{digits}W`.
+- **Any other source** answers `404`: only OpenLibrary can import works one at a time so far.
 
 ## Infrastructure
 
@@ -50,5 +67,5 @@ These read from OpenLibrary through a Redis read-through cache (24h TTL). They d
 
 ## Known issues
 
-- **Duplicate fetches.** Concurrent identical requests can each miss the cache and call OpenLibrary. A fetch lock is planned (see [todo.md](todo.md)).
-- **No 503 response.** If OpenLibrary is unreachable, routes return `500` like any other error.
+- **Duplicate fetches.** Concurrent identical searches can each miss the cache and call OpenLibrary, and concurrent resolves of the same new work each fetch it (only one import wins; the other links to it). A fetch lock is planned (see [todo.md](todo.md)).
+- **No "not found" cache.** Resolving an OpenLibrary ID that doesn't exist calls OpenLibrary every time.

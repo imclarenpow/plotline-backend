@@ -3,7 +3,7 @@ import { newUuid, toExternalIds } from '../utils.ts';
 import type { SourceName } from '../types.ts';
 import * as lookups from './sql/lookups.ts';
 import * as mutations from './sql/mutations.ts';
-import type { ContributedWork, Edition, NewEdition, NewWork, Work, WorkSignals } from './types.ts';
+import type { ContributedWork, Edition, NewEdition, NewWork, Work, WorkDetail, WorkSignals } from './types.ts';
 
 type Row = Record<string, any>;
 
@@ -43,6 +43,26 @@ async function withExternalIds(work: Work): Promise<Work> {
 export async function getWork(workId: string): Promise<Work | null> {
     const [row] = await lookups.getWorkById(workId);
     return row ? withExternalIds(rowToWork(row)) : null;
+}
+
+// The work with its contributors (display order, one entry per role) and a cover.
+export async function getWorkDetail(workId: string): Promise<WorkDetail | null> {
+    const work = await getWork(workId);
+    if (!work) return null;
+    const [contributors, [cover]] = await Promise.all([
+        lookups.getWorkContributors(workId),
+        lookups.getWorkCover(workId),
+    ]);
+    return {
+        ...work,
+        externalIds: work.externalIds ?? [],
+        contributors: contributors.map((row: Row) => ({ id: row.id, name: row.name, role: row.role })),
+        coverUrl: cover?.cover_url ?? null,
+    };
+}
+
+export async function workExists(workId: string): Promise<boolean> {
+    return (await lookups.workExists(workId)).length > 0;
 }
 
 export async function getWorkByExternalId(source: SourceName, externalId: string): Promise<Work | null> {
@@ -117,4 +137,13 @@ export async function getWorkSignals(workId: string): Promise<WorkSignals[]> {
 
 export async function setWorkXp(workId: string, xp: number, xpVersion: number): Promise<void> {
     await mutations.updateWorkXp(workId, xp, xpVersion);
+}
+
+// Links another ID from a source to the work (e.g. an OpenLibrary ID that redirects to it).
+export async function addWorkAlias(workId: string, source: SourceName, externalId: string): Promise<void> {
+    await mutations.insertWorkExternalIdIfNew(workId, source, externalId);
+}
+
+export async function refreshEditionCount(workId: string): Promise<void> {
+    await mutations.refreshEditionCount(workId);
 }

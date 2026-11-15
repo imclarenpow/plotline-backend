@@ -29,7 +29,7 @@ docker --context plotline-host compose --env-file .env -f db/docker/docker-compo
 ## Checking connectivity
 
 ```bash
-bun run test:db                         # Postgres + Redis connection tests and repo integration tests
+bun run test:db                         # every test, including connection, repo and handler tests against live Postgres + Redis
 ```
 
 Or, with the server running, `GET /api/test/postgres` and `GET /api/test/redis`.

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import * as ol from '../../config/openlibrary.ts';
-import { getAuthor, getAuthorCover, getBookCover, getEditions, getWork, search } from './client.ts';
+import { getAuthor, getAuthorCover, getBookCover, getEditions, getWork, search, UNREACHABLE } from './client.ts';
 
 // fetch is stubbed: these tests never touch the network.
 let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
@@ -22,7 +22,7 @@ describe("ID validation happens before any request", () => {
         ['getEditions', () => getEditions('not-an-id')],
         ['getAuthor', () => getAuthor('OL123W')],
     ])("%s rejects an invalid ID", async (_name, call) => {
-        await expect(call()).rejects.toThrow(/Invalid/);
+        await expect(call()).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/Invalid/) });
         expect(fetchSpy).not.toHaveBeenCalled();
     });
 });
@@ -61,9 +61,33 @@ describe("requests", () => {
         ['getEditions', () => getEditions('OL1W')],
         ['getAuthor', () => getAuthor('OL1A')],
         ['search', () => search('x', 1)],
-    ])("%s throws when OpenLibrary returns an error status", async (_name, call) => {
-        nextResponse = () => new Response('down', { status: 503 });
-        await expect(call()).rejects.toThrow(/Failed/);
+    ])("%s throws a 503 when OpenLibrary is down", async (_name, call) => {
+        nextResponse = () => new Response('down', { status: 502 });
+        await expect(call()).rejects.toMatchObject({ status: 503, message: UNREACHABLE });
+    });
+
+    test("a rate limit counts as unreachable", async () => {
+        nextResponse = () => new Response('slow down', { status: 429 });
+        await expect(getWork('OL1W')).rejects.toMatchObject({ status: 503 });
+    });
+
+    test("a network failure counts as unreachable", async () => {
+        fetchSpy.mockImplementation((async () => { throw new TypeError('fetch failed'); }) as any);
+        await expect(getWork('OL1W')).rejects.toMatchObject({ status: 503, message: UNREACHABLE });
+    });
+
+    test.each([
+        ['getWork', () => getWork('OL1W')],
+        ['getEditions', () => getEditions('OL1W')],
+        ['getAuthor', () => getAuthor('OL1A')],
+    ])("%s returns null for a 404", async (_name, call) => {
+        nextResponse = () => new Response('missing', { status: 404 });
+        expect(await call()).toBeNull();
+    });
+
+    test("other error statuses throw a plain error", async () => {
+        nextResponse = () => new Response('bad', { status: 400 });
+        await expect(getWork('OL1W')).rejects.toThrow(/Failed to fetch work OL1W: 400/);
     });
 });
 

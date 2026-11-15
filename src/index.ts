@@ -1,5 +1,6 @@
-import { bookWorkHandler, bookEditionHandler } from './api/books.ts';
+import { resolveWorkHandler, workEditionsHandler, workHandler } from './api/works.ts';
 import { searchHandler } from './api/search.ts';
+import { errorResponse } from './utils/api.ts';
 
 const env = process.env;
 import { testConnection as testPostgresConnection } from './db/bindings/postgres.ts';
@@ -22,25 +23,30 @@ const server = Bun.serve({
         "/api/debug/redis-flush": async () => await flushRedis(),
         "/api/search/:query": async req => {
             try {
-                const result = await searchHandler(`${req.params.query}`);
-                return result;
-            } catch (error: any) {
-                return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+                return await searchHandler(req.params.query);
+            } catch (error) {
+                return errorResponse(error);
             }
         },
-        "/api/books/:query": async req => {
+        "/api/works/resolve/:source/:externalId": async req => {
             try {
-                const result = await bookWorkHandler(`${req.params.query}`);
-                return result;
-            } catch (error: any) {
-                return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+                return await resolveWorkHandler(req.params.source, req.params.externalId);
+            } catch (error) {
+                return errorResponse(error);
             }
         },
-        "/api/books/:query/editions": async req => {
+        "/api/works/:id": async req => {
             try {
-                return await bookEditionHandler(`${req.params.query}`);
-            } catch (error: any) {
-                return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+                return await workHandler(req.params.id);
+            } catch (error) {
+                return errorResponse(error);
+            }
+        },
+        "/api/works/:id/editions": async req => {
+            try {
+                return await workEditionsHandler(req.params.id);
+            } catch (error) {
+                return errorResponse(error);
             }
         }
     }

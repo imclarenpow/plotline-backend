@@ -42,8 +42,10 @@ export async function searchHandler(query: string, limit: number = searchItemLim
     return jsonResponse(payload);
 }
 
+const refKey = (r: SearchResult) => (r.ref ? `${r.ref.source}:${r.ref.id}` : null);
+
 // Catalog results first; OpenLibrary results for works the catalog already returned are dropped.
 export function mergeResults(catalog: SearchResult[], openLibrary: SearchResult[], limit: number): SearchResult[] {
-    const seen = new Set(catalog.map(r => r.olid).filter(Boolean));
-    return [...catalog, ...openLibrary.filter(r => !r.olid || !seen.has(r.olid))].slice(0, limit);
+    const seen = new Set(catalog.map(refKey).filter(Boolean));
+    return [...catalog, ...openLibrary.filter(r => !seen.has(refKey(r)))].slice(0, limit);
 }
